@@ -102,24 +102,11 @@ function AuthPage() {
         toast.success(t("auth.accountCreatedCheck"));
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("auth.googleFailed"));
+      toast.error(error instanceof Error ? error.message : t("auth.signUpFailed", { defaultValue: "Sign up failed" }));
     } finally {
       setBusy(false);
     }
   };
-
-  const google = async () => {
-    try {
-      const { lovable } = await import("@/integrations/lovable");
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) toast.error(result.error.message ?? t("auth.googleFailed"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("auth.googleFailed"));
-    }
-  };
-
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -147,13 +134,6 @@ function AuthPage() {
             <CardDescription>{t("auth.cardDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full mb-4" onClick={google}>
-              {t("auth.google")}
-            </Button>
-            <div className="relative my-4 text-center text-xs text-muted-foreground">
-              <span className="bg-card px-2 relative z-10">{t("auth.or")}</span>
-              <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-            </div>
             <Tabs defaultValue="signin">
               <TabsList className="grid grid-cols-2 w-full">
                 <TabsTrigger value="signin">{t("auth.signIn")}</TabsTrigger>

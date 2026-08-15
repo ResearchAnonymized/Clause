@@ -44,7 +44,17 @@ describe("translation coverage", () => {
         const empties: string[] = [];
         for (const key of localeKeys) {
           const v = getAt(dict as unknown as AnyObj, key);
-          if (typeof v !== "string" || v.trim() === "") empties.push(key);
+          if (typeof v === "string") {
+            if (v.trim() === "") empties.push(key);
+            continue;
+          }
+          if (Array.isArray(v)) {
+            if (v.length === 0 || v.some((item) => typeof item !== "string" || item.trim() === "")) {
+              empties.push(key);
+            }
+            continue;
+          }
+          empties.push(key);
         }
         expect(empties).toEqual([]);
       });

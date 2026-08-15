@@ -1,29 +1,28 @@
-# Clause (local)
+# Clause
 
-Multi-agent contract intelligence for 2M-IT — self-hosted, Supabase/Lovable free.
+Multi-agent contract intelligence — self-hosted TanStack Start + Postgres + MinIO.
 
 ## Stack
 
-- **App:** React 19 + TanStack Start/Router/Query
+- **App:** React 19 + TanStack Start / Router / Query
 - **DB:** PostgreSQL 16 + pgvector
-- **Auth:** Cookie sessions (`users` / `sessions`)
-- **Files:** Local filesystem (`storage/`) or MinIO
-- **AI:** OpenAI-compatible API (`AI_BASE_URL` + `AI_API_KEY`)
-- **Worker (optional):** Python FastAPI + LangGraph
+- **Auth:** Cookie sessions (`clause_session`)
+- **Files:** MinIO (S3) or local filesystem
+- **AI:** OpenAI-compatible API (`AI_BASE_URL` + `AI_API_KEY`) — analysis runs inline in the app
 
 ## Quick start
 
 ```bash
 # 1) Start Postgres (+ optional MinIO)
-docker compose up -d db
+docker compose up -d db minio minio-init
 
-# 2) Install & run the app (pnpm recommended; npm 10 can fail on peer resolution)
-cp .env.example .env   # if needed
+# 2) Install & run
+cp .env.example .env
 pnpm install
 pnpm run dev
 ```
 
-Open http://localhost:3000 — sign up with email/password. The **first user becomes admin** and gets a personal workspace.
+Open http://localhost:3000 — sign up with email/password. The **first user becomes platform admin** and gets a personal workspace/organization.
 
 ## Environment
 
@@ -32,28 +31,17 @@ See `.env.example`. Important keys:
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | Postgres connection |
-| `SESSION_SECRET` | Session hardening (set a long random value) |
-| `STORAGE_DRIVER` | `fs` (default) or `s3` for MinIO |
-| `AI_API_KEY` | Required for inline analysis / embeddings |
-| `WORKER_URL` | Optional external analysis worker |
+| `SESSION_SECRET` | Session hardening (long random value) |
+| `STORAGE_*` | MinIO / S3 settings |
+| `AI_API_KEY` | Required for analysis / embeddings |
 
-## Worker
-
-```bash
-cd worker
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn worker.main:app --reload --port 8080
-```
-
-Set `WORKER_URL=http://localhost:8080` in the app `.env`.
+Apply schema with `db/schema.sql` and additive `db/migrate-*.sql` (see `deploy/apply-migrations.sh`).
 
 ## Notes
 
 - Browser data access is proxied through `/api/db` (authenticated).
 - Realtime run updates use short polling.
-- Live database schema: `db/schema.sql` plus additive `db/migrate-*.sql`.
+- Do not commit `.env` or secrets.
 
 ## Demo hosting (Hetzner EU)
 

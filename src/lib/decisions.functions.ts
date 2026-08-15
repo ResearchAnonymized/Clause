@@ -37,19 +37,3 @@ export const sealDecisionSignature = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true as const, ip, userId };
   });
-
-/**
- * Store the SHA-256 of the generated audit PDF against the decision so
- * anyone verifying the PDF later can match its hash against the record.
- */
-export const recordReportHash = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: { decisionId: string; hash: string }) => data)
-  .handler(async ({ data, context }) => {
-    if (!/^[0-9a-f]{64}$/.test(data.hash)) throw new Error("Invalid hash");
-    const { error } = await (context.supabase.from("decisions" as any) as any)
-      .update({ report_sha256: data.hash })
-      .eq("id", data.decisionId);
-    if (error) throw new Error(error.message);
-    return { ok: true as const };
-  });
