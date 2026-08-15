@@ -1,0 +1,41 @@
+APPENDIX 1.2 — DESCRIPTION OF PERSONAL DATA PROCESSING ACTIVITIES
+Controller: Participating wellbeing services county (via 2M-IT coordination)
+Processor: Selected Supplier
+
+1.2.1 CareFlow — Personal data processing description
+
+Purpose of processing
+Provision of CareFlow clinical pathway software, support, and hosting.
+
+Categories of data subjects
+Patients / clients of wellbeing services; healthcare professionals; Organisation administrators.
+
+Categories of personal data
+- Identification data (name, unique identifiers)
+- Contact data
+- Health and care-related data (special category / sensitive)
+- Authentication and audit logs
+
+Special categories
+Yes — health data under GDPR Art. 9. Processing basis coordinated by the Controller.
+
+Retention
+As instructed by the Controller; default operational retention 10 years for care records unless
+shorter period required by applicable Finnish healthcare legislation.
+
+Location of processing
+EEA only. Transfers outside the EEA require prior written approval and appropriate safeguards
+(e.g. SCCs + TIA).
+
+Sub-processors
+Listed in the Supplier’s DPA response; changes require Organisation approval.
+
+Security measures
+ISO/IEC 27001 (or equivalent), encryption in transit/at rest, access control, logging,
+incident notification within 24 hours.
+
+NOTE
+CareFlow is listed in this Appendix 1.2. Any Supplier response that omits CareFlow from the
+DPA / processing description constitutes a DPA gap (critical).
+
+END OF DOCUMENT

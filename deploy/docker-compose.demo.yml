@@ -1,0 +1,21 @@
+# Production / demo override: do not expose DB or MinIO publicly.
+# Usage:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.demo.yml up -d db minio minio-init
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      # Override defaults when you change passwords — keep in sync with .env DATABASE_URL
+      POSTGRES_USER: clause
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clause}
+      POSTGRES_DB: clause
+
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-clause}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-clause-secret}

@@ -1,0 +1,35 @@
+SUPPLIER MAIN AGREEMENT / OFFER
+Bidder: NordicCare Soft Oy (“Supplier”)
+Procurement: 2M-IT / 2026 / CAREFlow-01
+Offered service: CareFlow-compatible pathway platform (“PathLynx”)
+
+1. Acceptance
+NordicCare Soft Oy offers to supply PathLynx as CareFlow replacement under the draft Framework
+Agreement, subject to the deviations in this Offer and its annexes.
+
+2. Term
+Four (4) years from Go-Live + two optional 12-month extensions.
+
+3. Termination for convenience — NOTICE PERIOD (INTENTIONAL DEMO GAP)
+Either party may terminate for convenience with eighteen (18) months’ prior written notice.
+The Supplier does not accept a shorter Organisation exit right.
+(Demo note: Organisation Appendix 2 requires max 12 months — 18 months is CRITICAL misalignment.)
+
+4. Service levels
+Service levels are exclusively those in Supplier Appendix 5 (Service Levels). In case of conflict
+with the Organisation’s Appendix 1.1, Supplier Appendix 5 prevails.
+
+5. Price adjustments (INTENTIONAL DEMO GAP)
+The Supplier may increase fees annually by up to 8% or by the full amount of any third-party
+licence cost increase, whichever is higher. Such increases apply even if the Organisation cannot
+pass them through to end customers.
+(Demo note: Organisation allows max 3% ICT index / mirrored pass-through only.)
+
+6. Governing law
+Finland.
+
+Signed for demo purposes:
+NordicCare Soft Oy — Offer Manager
+Date: 2026-03-01
+
+END OF DOCUMENT

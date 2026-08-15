@@ -1,0 +1,29 @@
+SUPPLIER MAIN AGREEMENT / OFFER (ALIGNED DEMO BIDDER)
+Bidder: Aurora Health Systems Oy (“Supplier”)
+Procurement: 2M-IT / 2026 / CAREFlow-01
+Offered service: CareFlow
+
+1. Acceptance
+Aurora Health Systems Oy accepts the Draft Framework Agreement and Appendices 1.1, 1.2, 2 and 5
+without material deviation, except as expressly listed as clarifications (none material).
+
+2. Termination for convenience — NOTICE PERIOD
+Either party may terminate for convenience with twelve (12) months’ prior written notice,
+aligned with Organisation Appendix 2.
+
+3. Service levels
+CareFlow shall be delivered at Service Level V2 as defined in Organisation Appendix 1.1 and
+mirrored in Supplier Appendix 5.
+
+4. Price adjustments
+Annual ICT index adjustment max 3%. Third-party licence pass-through only when the Organisation
+can pass the same increase to the end customer under Appendix 5.
+
+5. Governing law
+Finland.
+
+Signed for demo purposes:
+Aurora Health Systems Oy — Bid Lead
+Date: 2026-03-02
+
+END OF DOCUMENT

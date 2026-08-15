@@ -1,0 +1,20 @@
+APPENDIX 1.1 — SERVICE AND INFORMATION SYSTEM MAP
+Customer / Organisation baseline (2M-IT)
+
+| # | System / Service | Description | Service Level | Criticality |
+|---|------------------|-------------|---------------|-------------|
+| 1 | CareFlow | Clinical care pathway and case-management SaaS used by wellbeing services counties. Includes appointment orchestration, care plans, and integration APIs. | V2 | Business-critical |
+| 2 | Identity Bridge | Federation connector for HAKA / Suomi.fi e-Identification (supporting service). | V1 | Supporting |
+
+CareFlow — Service Level V2 meaning (Organisation baseline)
+- Availability: 99.9% measured monthly (excluding agreed maintenance windows)
+- Severity-1 incident response: 30 minutes
+- Severity-1 resolution target: 4 hours
+- Planned maintenance: max 4 hours / month, outside 07:00–18:00 EET on weekdays
+- RPO: 1 hour | RTO: 4 hours
+
+NOTE FOR EVALUATION
+The target service for this procurement is CareFlow. CareFlow MUST appear in the Supplier’s
+Appendix 5 Service Levels response at level V2 (or better). Any mismatch vs V2 is critical.
+
+END OF DOCUMENT

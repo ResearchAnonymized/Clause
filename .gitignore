@@ -1,0 +1,55 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+.output
+.vinxi
+.tanstack/**
+.nitro
+*.local
+
+# Secrets / local runtime
+.env
+.env.*
+!.env.example
+!.env.*.example
+storage/**
+!storage/.gitkeep
+
+# Package manager cruft (pnpm is canonical)
+bun.lock
+bun.lockb
+package-lock.json
+yarn.lock
+
+# Generated / local demo artifacts
+_tmp_*
+*.pdf
+!samples/**/*.pdf
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Deploy secrets (keep examples only)
+deploy/*.env
+!deploy/env.production.example

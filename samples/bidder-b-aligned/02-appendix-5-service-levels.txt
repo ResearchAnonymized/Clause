@@ -1,0 +1,11 @@
+SUPPLIER APPENDIX 5 — SERVICE LEVELS (ALIGNED)
+Bidder: Aurora Health Systems Oy
+
+| Service | Offered level | Availability | Sev-1 response | Sev-1 resolve |
+|---------|---------------|--------------|----------------|---------------|
+| CareFlow | V2 | 99.9% monthly | 30 minutes | 4 hours |
+| Identity Bridge | V1 | 99.5% monthly | 4 hours | 24 hours |
+
+CareFlow V2 matches Organisation Appendix 1.1 (RPO 1h, RTO 4h, maintenance outside 07:00–18:00 EET).
+
+END OF DOCUMENT

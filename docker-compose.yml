@@ -1,0 +1,57 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: clause-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clause
+      POSTGRES_PASSWORD: clause
+      POSTGRES_DB: clause
+    ports:
+      - "5432:5432"
+    volumes:
+      - clause_pg_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clause -d clause"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: clause-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: clause
+      MINIO_ROOT_PASSWORD: clause-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - clause_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 clause clause-secret;
+      mc mb -p local/contracts || true;
+      mc anonymous set none local/contracts;
+      exit 0;
+      "
+
+volumes:
+  clause_pg_data:
+  clause_minio_data:

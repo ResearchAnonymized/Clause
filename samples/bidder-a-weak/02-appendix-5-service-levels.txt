@@ -1,0 +1,19 @@
+SUPPLIER APPENDIX 5 — SERVICE LEVELS
+Bidder: NordicCare Soft Oy
+Service: PathLynx (proposed for CareFlow scope)
+
+| Service | Offered level | Availability | Sev-1 response | Sev-1 resolve |
+|---------|---------------|--------------|----------------|---------------|
+| PathLynx / CareFlow scope | V1 | 99.5% monthly | 2 hours | 8 hours |
+| Identity Bridge (if ordered) | V1 | 99.5% monthly | 4 hours | 24 hours |
+
+V1 definition (Supplier)
+- Planned maintenance: up to 8 hours / month, may include weekday evenings
+- RPO: 4 hours | RTO: 12 hours
+- No 99.9% commitment
+
+DEMO NOTE — intentional gap vs Organisation Appendix 1.1:
+Organisation requires CareFlow at Service Level V2.
+Supplier offers V1 only → SLA level comparison = CRITICAL.
+
+END OF DOCUMENT

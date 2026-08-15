@@ -1,0 +1,304 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-critical: var(--critical);
+  --color-warning: var(--warning);
+  --color-ok: var(--ok);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * 2M-IT brand palette: deep navy #0A2472 anchoring a calm enterprise light theme.
+ */
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.99 0.004 250);
+  --foreground: oklch(0.18 0.05 264);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.05 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.05 264);
+
+  --brand: oklch(0.28 0.14 267);              /* ~#0A2472 */
+  --brand-foreground: oklch(0.99 0.004 250);
+  --brand-soft: oklch(0.94 0.03 260);
+
+  --primary: oklch(0.28 0.14 267);
+  --primary-foreground: oklch(0.99 0.004 250);
+
+  --secondary: oklch(0.96 0.01 255);
+  --secondary-foreground: oklch(0.22 0.08 265);
+
+  --muted: oklch(0.96 0.008 255);
+  --muted-foreground: oklch(0.5 0.03 258);
+
+  --accent: oklch(0.94 0.03 260);
+  --accent-foreground: oklch(0.24 0.1 267);
+
+  --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(0.99 0.003 250);
+
+  --critical: oklch(0.55 0.22 27);
+  --warning: oklch(0.75 0.16 75);
+  --ok: oklch(0.62 0.14 155);
+
+  --border: oklch(0.9 0.015 258);
+  --input: oklch(0.92 0.012 258);
+  --ring: oklch(0.28 0.14 267);
+
+  --chart-1: oklch(0.28 0.14 267);
+  --chart-2: oklch(0.55 0.14 220);
+  --chart-3: oklch(0.62 0.14 155);
+  --chart-4: oklch(0.75 0.16 75);
+  --chart-5: oklch(0.55 0.22 27);
+
+  --sidebar: oklch(0.24 0.12 267);              /* navy sidebar */
+  --sidebar-foreground: oklch(0.94 0.02 255);
+  --sidebar-primary: oklch(0.99 0.004 250);
+  --sidebar-primary-foreground: oklch(0.24 0.12 267);
+  --sidebar-accent: oklch(0.32 0.13 267);
+  --sidebar-accent-foreground: oklch(0.99 0.004 250);
+  --sidebar-border: oklch(0.34 0.11 267);
+  --sidebar-ring: oklch(0.6 0.12 255);
+}
+
+.dark {
+  --background: oklch(0.16 0.04 264);
+  --foreground: oklch(0.97 0.004 250);
+  --card: oklch(0.22 0.06 265);
+  --card-foreground: oklch(0.97 0.004 250);
+  --popover: oklch(0.22 0.06 265);
+  --popover-foreground: oklch(0.97 0.004 250);
+  --brand: oklch(0.62 0.15 265);
+  --brand-foreground: oklch(0.16 0.04 264);
+  --brand-soft: oklch(0.3 0.1 267);
+  --primary: oklch(0.62 0.15 265);
+  --primary-foreground: oklch(0.16 0.04 264);
+  --secondary: oklch(0.28 0.06 265);
+  --secondary-foreground: oklch(0.97 0.004 250);
+  --muted: oklch(0.28 0.06 265);
+  --muted-foreground: oklch(0.72 0.03 258);
+  --accent: oklch(0.3 0.08 265);
+  --accent-foreground: oklch(0.97 0.004 250);
+  --destructive: oklch(0.62 0.2 27);
+  --destructive-foreground: oklch(0.99 0.003 250);
+  --critical: oklch(0.65 0.2 27);
+  --warning: oklch(0.78 0.15 75);
+  --ok: oklch(0.7 0.14 155);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.15 265);
+  --sidebar: oklch(0.2 0.09 267);
+  --sidebar-foreground: oklch(0.95 0.02 255);
+  --sidebar-primary: oklch(0.62 0.15 265);
+  --sidebar-primary-foreground: oklch(0.16 0.04 264);
+  --sidebar-accent: oklch(0.28 0.1 267);
+  --sidebar-accent-foreground: oklch(0.97 0.004 250);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.15 265);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Soft workspace surface behind authenticated pages */
+.app-main-surface {
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(1200px 420px at 12% -10%, color-mix(in oklch, var(--color-brand) 8%, transparent), transparent 60%),
+    radial-gradient(900px 380px at 100% 0%, color-mix(in oklch, var(--color-brand) 5%, transparent), transparent 55%);
+}
+
+@keyframes evidence-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; }
+  60%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@utility animate-evidence-pulse {
+  animation: evidence-pulse 1.2s ease-out 1;
+}
+
+/* Evidence quote highlight in document viewer (plain text + Word HTML) */
+mark.evidence-hit,
+.evidence-hit {
+  color: inherit !important;
+  padding: 0.05em 0.15em;
+  border-radius: 0.2em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Default / unknown — soft amber (search without a verdict) */
+mark.evidence-hit:not([class*="evidence-tone-"]),
+.evidence-hit:not([class*="evidence-tone-"]),
+.evidence-tone-not_addressed.evidence-hit,
+mark.evidence-hit.evidence-tone-not_addressed {
+  background-color: rgb(148 163 184 / 0.45) !important;
+  outline: 1px solid rgb(100 116 139 / 0.75);
+  box-shadow: 0 0 0 2px rgb(148 163 184 / 0.3);
+}
+
+.evidence-tone-gap.evidence-hit,
+mark.evidence-hit.evidence-tone-gap {
+  background-color: color-mix(in oklch, var(--critical) 42%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--critical) 85%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--critical) 28%, transparent);
+}
+
+.evidence-tone-partial.evidence-hit,
+mark.evidence-hit.evidence-tone-partial {
+  background-color: color-mix(in oklch, var(--warning) 48%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--warning) 90%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--warning) 32%, transparent);
+}
+
+.evidence-tone-aligned.evidence-hit,
+mark.evidence-hit.evidence-tone-aligned {
+  background-color: color-mix(in oklch, var(--ok) 42%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--ok) 85%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ok) 28%, transparent);
+}
+
+/* PDF page overlay highlight (pdf.js canvas viewer) */
+.evidence-pdf-hit {
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+}
+
+.evidence-pdf-hit:not([class*="evidence-tone-"]),
+.evidence-pdf-hit.evidence-tone-not_addressed {
+  background-color: rgb(148 163 184 / 0.4);
+  outline: 1.5px solid rgb(100 116 139 / 0.9);
+  box-shadow: 0 0 0 2px rgb(148 163 184 / 0.3);
+}
+
+.evidence-pdf-hit.evidence-tone-gap {
+  background-color: color-mix(in oklch, var(--critical) 38%, transparent);
+  outline: 1.5px solid color-mix(in oklch, var(--critical) 92%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--critical) 28%, transparent);
+}
+
+.evidence-pdf-hit.evidence-tone-partial {
+  background-color: color-mix(in oklch, var(--warning) 42%, transparent);
+  outline: 1.5px solid color-mix(in oklch, var(--warning) 92%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--warning) 30%, transparent);
+}
+
+.evidence-pdf-hit.evidence-tone-aligned {
+  background-color: color-mix(in oklch, var(--ok) 38%, transparent);
+  outline: 1.5px solid color-mix(in oklch, var(--ok) 92%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ok) 28%, transparent);
+}
+
+/* Whole table cell tint when a mark lands inside (Word / HTML tables) */
+.evidence-doc td.evidence-hit-cell,
+.evidence-doc th.evidence-hit-cell {
+  outline: 1px solid color-mix(in oklch, var(--warning) 45%, transparent);
+  background-color: color-mix(in oklch, var(--warning) 18%, transparent) !important;
+}
+
+.evidence-doc td.evidence-hit-cell.evidence-tone-gap,
+.evidence-doc th.evidence-hit-cell.evidence-tone-gap {
+  background-color: color-mix(in oklch, var(--critical) 18%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--critical) 45%, transparent);
+}
+
+.evidence-doc td.evidence-hit-cell.evidence-tone-partial,
+.evidence-doc th.evidence-hit-cell.evidence-tone-partial {
+  background-color: color-mix(in oklch, var(--warning) 20%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--warning) 50%, transparent);
+}
+
+.evidence-doc td.evidence-hit-cell.evidence-tone-aligned,
+.evidence-doc th.evidence-hit-cell.evidence-tone-aligned {
+  background-color: color-mix(in oklch, var(--ok) 18%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--ok) 45%, transparent);
+}
+
+.evidence-doc td.evidence-hit-cell.evidence-tone-not_addressed,
+.evidence-doc th.evidence-hit-cell.evidence-tone-not_addressed {
+  background-color: rgb(148 163 184 / 0.2) !important;
+  outline: 1px solid rgb(100 116 139 / 0.4);
+}
+
+/* Compact evidence / pack document typography */
+.evidence-doc {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.evidence-doc :where(p, li, td, th) {
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+.evidence-doc :where(h1) {
+  font-size: 14px;
+  line-height: 1.35;
+  margin-top: 0.75em;
+  margin-bottom: 0.4em;
+}
+.evidence-doc :where(h2, h3, h4) {
+  font-size: 12.5px;
+  line-height: 1.35;
+  margin-top: 0.65em;
+  margin-bottom: 0.3em;
+}
+.evidence-doc :where(table) {
+  font-size: 11.5px;
+}
+.evidence-doc :where(td, th) {
+  padding: 0.25em 0.4em;
+}

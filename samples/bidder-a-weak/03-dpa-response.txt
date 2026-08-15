@@ -1,0 +1,23 @@
+SUPPLIER DATA PROCESSING RESPONSE
+Bidder: NordicCare Soft Oy
+
+1. Systems covered by this DPA response
+- Identity Bridge connector (optional)
+- Generic hosting telemetry platform
+
+2. CareFlow / PathLynx clinical processing
+Not included in this DPA annex at offer stage. A separate DPA will be “discussed after award”
+if requested by the Organisation.
+
+DEMO NOTE — intentional gap:
+Organisation Appendix 1.2.1 lists CareFlow processing of health data.
+This bidder pack omits CareFlow from the DPA description → DPA appendix presence = CRITICAL.
+
+3. Location
+Primary processing in EU; disaster-recovery copy may be stored in the United Kingdom without
+prior approval workflow.
+
+4. Breach notification
+Supplier will notify “without undue delay”, target five (5) business days.
+
+END OF DOCUMENT

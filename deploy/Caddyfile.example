@@ -1,0 +1,7 @@
+# Replace demo.yourdomain.com with your real hostname.
+# Install: cp deploy/Caddyfile.example /etc/caddy/Caddyfile && systemctl reload caddy
+
+demo.yourdomain.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}

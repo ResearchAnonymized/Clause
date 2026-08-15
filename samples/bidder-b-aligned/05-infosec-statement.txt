@@ -1,0 +1,22 @@
+INFORMATION SECURITY STATEMENT (ALIGNED)
+Bidder: Aurora Health Systems Oy
+
+1. Certification
+ISO/IEC 27001 certified (certificate ID DEMO-ISO-27001-2025). SOC 2 Type II report available
+under NDA within five business days.
+
+2. Encryption
+TLS 1.3 in transit; AES-256 at rest for all CareFlow data stores.
+
+3. Incident / personal data breach notification
+Without undue delay and in any event within twenty-four (24) hours of becoming aware.
+
+4. Sub-processors
+Disclosed in DPA response; material changes require prior written approval.
+
+5. Penetration testing
+Annual independent penetration test; executive summary available under NDA.
+
+Aligned with Organisation Framework Agreement information-security minimum.
+
+END OF DOCUMENT
