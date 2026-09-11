@@ -19,7 +19,7 @@ export const CHUNKER_VERSION = 2;
 
 // ANALYZER_VERSION — bump on prompt, model, or output-schema changes for
 // the specialist agents.
-export const ANALYZER_VERSION = 1;
+export const ANALYZER_VERSION = 2;
 
 export type StalenessLevel = "fresh" | "minor" | "critical";
 

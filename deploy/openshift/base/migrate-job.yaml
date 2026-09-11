@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: counterpart-migrate
+  namespace: counterpart
+  labels:
+    app.kubernetes.io/name: counterpart
+    app.kubernetes.io/component: migrate
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: pgvector/pgvector:pg16
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: counterpart-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: migrate
+              mountPath: /migrate
+              readOnly: true
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              until pg_isready -h postgres -U clause -d clause; do sleep 2; done
+              for f in /migrate/*.sql; do
+                echo "Applying $f"
+                psql -h postgres -U clause -d clause -v ON_ERROR_STOP=0 -f "$f"
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: migrate
+          configMap:
+            name: counterpart-db-migrate

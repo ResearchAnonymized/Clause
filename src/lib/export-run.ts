@@ -1,5 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toVerdict, type Verdict as AlignmentVerdict } from "@/lib/verdict";
+import { alignmentScore } from "@/lib/report-data";
 
 export type Finding = {
   criterion_name: string;
@@ -57,7 +59,7 @@ type Criterion = {
   enabled?: boolean | null;
 };
 
-// ---------- Palette (Clause / 2M-IT navy) ----------
+// ---------- Palette (Counterpart navy) ----------
 const NAVY: [number, number, number] = [10, 36, 114];
 const NAVY_DEEP: [number, number, number] = [6, 22, 74];
 const INK: [number, number, number] = [22, 28, 45];
@@ -90,48 +92,52 @@ export type Verdict = {
   rationale: string;
 };
 
+function alignmentVerdicts(run: Run, findings: Finding[]): AlignmentVerdict[] {
+  if (findings.length) return findings.map((f) => toVerdict(f.severity));
+  return [
+    ...Array(run.ok_count ?? 0).fill("aligned" as const),
+    ...Array(run.warning_count ?? 0).fill("partial" as const),
+    ...Array(run.critical_count ?? 0).fill("gap" as const),
+  ];
+}
+
 export function computeVerdict(run: Run, findings: Finding[]): Verdict {
-  const c = run.critical_count ?? findings.filter((f) => f.severity === "critical").length;
-  const w = run.warning_count ?? findings.filter((f) => f.severity === "warning").length;
+  const vs = alignmentVerdicts(run, findings);
+  const c = vs.filter((v) => v === "gap").length;
+  const w = vs.filter((v) => v === "partial").length;
   if (c > 0) {
     return {
       code: "REJECT",
-      labelEn: "DO NOT SIGN — Renegotiation required",
-      labelFi: "Ei allekirjoitusta — uudelleenneuvottelu vaaditaan",
-      labelSv: "Underteckna inte — omförhandling krävs",
+      labelEn: "Do not sign",
+      labelFi: "Älä allekirjoita",
+      labelSv: "Underteckna inte",
       color: CRIT,
-      rationale: `${c} material breach${c === 1 ? "" : "es"} of the customer template identified. The offer, as submitted, cannot be recommended for signature.`,
+      rationale: `${c} gap${c === 1 ? "" : "s"} must be resolved before signature.`,
     };
   }
   if (w > 0) {
     return {
       code: "CONDITIONAL",
-      labelEn: "SIGN WITH CONDITIONS — Address warnings before execution",
-      labelFi: "Allekirjoitettavissa ehdoin — huomautukset korjattava",
-      labelSv: "Underteckna med villkor — åtgärda anmärkningar före verkställande",
+      labelEn: "Negotiate before signing",
+      labelFi: "Neuvottele ennen allekirjoitusta",
+      labelSv: "Förhandla före undertecknande",
       color: WARN,
-      rationale: `No critical gaps, but ${w} deviation${w === 1 ? "" : "s"} require documented clarification, side-letter, or monitoring plan prior to signature.`,
+      rationale: `${w} partial match${w === 1 ? "" : "es"} need supplier clarification.`,
     };
   }
   return {
     code: "APPROVE",
-    labelEn: "SAFE TO SIGN — Aligned with customer template",
-    labelFi: "Allekirjoitettavissa — vastaa asiakasmallia",
-    labelSv: "Säker att underteckna — överensstämmer med kundmallen",
+    labelEn: "Safe to sign",
+    labelFi: "Allekirjoitettavissa",
+    labelSv: "Säker att underteckna",
     color: OK,
-    rationale: "All evaluated criteria are met or exceeded. Proceed to signature per internal governance.",
+    rationale: "Evaluated requirements meet the customer template.",
   };
 }
 
 
 export function complianceScore(run: Run, findings: Finding[]) {
-  const c = run.critical_count ?? findings.filter((f) => f.severity === "critical").length;
-  const w = run.warning_count ?? findings.filter((f) => f.severity === "warning").length;
-  const o = run.ok_count ?? findings.filter((f) => f.severity === "ok").length;
-  const total = c + w + o;
-  if (!total) return 0;
-  const weighted = o * 1 + w * 0.5 + c * 0;
-  return Math.round((weighted / total) * 100);
+  return alignmentScore(alignmentVerdicts(run, findings));
 }
 
 export function riskScore(run: Run, findings: Finding[]) {
@@ -404,7 +410,7 @@ export async function buildAuditPdfInput(
     engagementTitle: run.title,
     reportTitle,
     reportSubtitle,
-    preparedBy: reviewerName || "Clause — Contract Intelligence",
+    preparedBy: reviewerName || "Counterpart — Contract Intelligence",
     preparedAt: run.completed_at ? new Date(run.completed_at) : new Date(),
     docSha256,
     run: {

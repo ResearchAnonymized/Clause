@@ -2,6 +2,7 @@
  * OCR fallback for scanned / image-only PDFs via OpenRouter-compatible vision/file API.
  */
 import { hasUsableExtractedText, cleanExtractedText } from "@/lib/analysis-agents.server";
+import { isAutoRouterModel } from "@/lib/agent-defaults";
 
 const MAX_OCR_BYTES = 12 * 1024 * 1024;
 
@@ -42,10 +43,12 @@ export async function ocrPdfWithVision(
   }
 
   const base = (process.env.AI_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
-  const model =
+  const requested =
     process.env.AI_OCR_MODEL ||
     process.env.AI_DEFAULT_MODEL ||
     "google/gemini-2.5-flash";
+  // Auto Router is for text analysis; scanned PDFs need a pinned vision model.
+  const model = isAutoRouterModel(requested) ? "google/gemini-2.5-flash" : requested;
 
   const b64 = buf.toString("base64");
   const dataUrl = `data:application/pdf;base64,${b64}`;
@@ -55,7 +58,7 @@ export async function ocrPdfWithVision(
   };
   if (base.includes("openrouter.ai")) {
     headers["HTTP-Referer"] = process.env.APP_URL || "http://localhost:3000";
-    headers["X-Title"] = "Clause OCR";
+    headers["X-Title"] = "Counterpart OCR";
   }
 
   const body = {

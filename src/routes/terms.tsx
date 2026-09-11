@@ -1,22 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_CONTACT } from "@/lib/legal-content";
+import { legalContact } from "@/lib/legal-content";
+import { PRODUCT_NAME } from "@/config/instance";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of use — Clause" },
-      { name: "description", content: "The terms that govern use of the Clause contract-review workspace by 2M-IT reviewers." },
-      { property: "og:title", content: "Terms of use — Clause" },
-      { property: "og:description", content: "Terms governing use of the Clause workspace." },
+      { title: `Terms of use — ${PRODUCT_NAME}` },
+      { name: "description", content: `The terms that govern use of the ${PRODUCT_NAME} contract-review workspace.` },
+      { property: "og:title", content: `Terms of use — ${PRODUCT_NAME}` },
+      { property: "og:description", content: `Terms governing use of ${PRODUCT_NAME}.` },
       { property: "og:type", content: "article" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: () => (
+  component: () => {
+    const contact = legalContact();
+    return (
     <LegalPage
       title="Terms of use"
-      intro="These terms apply to reviewers who sign in to Clause to analyse supplier contracts on behalf of 2M-IT."
+      intro={`These terms apply to people who sign in to ${PRODUCT_NAME} to analyse reference and response documents.`}
     >
       <h2>Acceptable use</h2>
       <ul>
@@ -34,8 +37,8 @@ export const Route = createFileRoute("/terms")({
 
       <h2>Data ownership</h2>
       <p>
-        2M-IT and its workspaces own the contracts they upload and the analyses derived from them.
-        Clause processes this content solely to provide the review workspace under the Data
+        Your organization owns the documents you upload and the analyses derived from them.
+        {PRODUCT_NAME} processes this content solely to provide the review workspace under the Data
         Processing Agreement.
       </p>
 
@@ -47,16 +50,17 @@ export const Route = createFileRoute("/terms")({
 
       <h2>Termination</h2>
       <p>
-        Reviewers may close their account from <em>Settings → Privacy &amp; Data</em>. 2M-IT may
+        You may close your account from <em>Settings → Privacy &amp; Data</em>. The operator may
         suspend accounts that breach these terms. On termination, personal data is deleted
         following the retention schedule in the <a href="/privacy">Privacy notice</a>.
       </p>
 
       <h2>Governing law &amp; contact</h2>
       <p>
-        These terms are governed by the laws of Finland. Questions:
-        <a href={`mailto:${LEGAL_CONTACT.email}`}> {LEGAL_CONTACT.email}</a>.
+        These terms are governed by the laws of Finland unless the operator specifies otherwise.
+        Questions: {contact.email ? <a href={`mailto:${contact.email}`}>{contact.email}</a> : contact.emailDisplay}.
       </p>
     </LegalPage>
-  ),
+    );
+  },
 });

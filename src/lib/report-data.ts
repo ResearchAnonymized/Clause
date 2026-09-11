@@ -1,5 +1,6 @@
-// Shared helpers to derive dynamic report data from findings + criteria.
-// Used by both the web report and PDF exports so numbers stay in sync.
+// Shared helpers to derive report data from findings + criteria.
+// Project view, full report, shared links, PDF, and CSV all use this so
+// the score and recommendation stay in sync.
 import { toVerdict, type Verdict } from "@/lib/verdict";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -35,21 +36,84 @@ export type ReportFinding = {
   clause_ref?: string | null;
   grounded?: boolean | null;
 };
-export type ReportCriterion = { id: string; name: string; category: string | null };
+export type ReportCriterion = {
+  id: string;
+  name: string;
+  category: string | null;
+  enabled?: boolean | null;
+};
 
-const VERDICT_SCORE: Record<Verdict, number> = {
-  aligned: 100,
-  partial: 55,
-  gap: 15,
+/** Meets = 1, Partial = 0.5, Gap / not addressed = 0. Score is the rounded percent. */
+export const VERDICT_WEIGHT: Record<Verdict, number> = {
+  aligned: 1,
+  partial: 0.5,
+  gap: 0,
   not_addressed: 0,
+};
+
+export function alignmentScore(verdicts: Verdict[]): number {
+  if (!verdicts.length) return 0;
+  const sum = verdicts.reduce((s, v) => s + VERDICT_WEIGHT[v], 0);
+  return Math.round((sum / verdicts.length) * 100);
+}
+
+export type RecommendationKind = "pending" | "reject" | "negotiate" | "sign";
+
+export type ReportRecommendation = {
+  kind: RecommendationKind;
+  headline: string;
+  reason: string;
+};
+
+export function recommendationFromCounts(
+  counts: Record<Verdict, number>,
+): ReportRecommendation {
+  const scored = counts.aligned + counts.partial + counts.gap;
+  if (scored === 0) {
+    return {
+      kind: "pending",
+      headline: "Analysis in progress",
+      reason: "Verdicts appear here as each agent finishes.",
+    };
+  }
+  if (counts.gap > 0) {
+    const n = counts.gap;
+    return {
+      kind: "reject",
+      headline: "Do not sign",
+      reason: `${n} gap${n === 1 ? "" : "s"} must be resolved before signature.`,
+    };
+  }
+  if (counts.partial > 0) {
+    const n = counts.partial;
+    return {
+      kind: "negotiate",
+      headline: "Negotiate before signing",
+      reason: `${n} partial match${n === 1 ? "" : "es"} need supplier clarification.`,
+    };
+  }
+  return {
+    kind: "sign",
+    headline: "Safe to sign",
+    reason: "Evaluated requirements meet the customer template.",
+  };
+}
+
+export type ReportRow = {
+  criterion: ReportCriterion;
+  finding: ReportFinding | null;
+  verdict: Verdict;
+  category: string;
 };
 
 export function computeReportData(findings: ReportFinding[], criteria: ReportCriterion[]) {
   const byCriterion = new Map<string, ReportFinding>();
   for (const f of findings) if (f.criterion_id) byCriterion.set(f.criterion_id, f);
 
-  const rows = criteria.length
-    ? criteria.map((c) => {
+  const scoped = criteria.filter((c) => c.enabled !== false);
+
+  const rows: ReportRow[] = scoped.length
+    ? scoped.map((c) => {
         const f = byCriterion.get(c.id) ?? null;
         const v: Verdict = f ? toVerdict(f.severity) : "not_addressed";
         return {
@@ -69,32 +133,29 @@ export function computeReportData(findings: ReportFinding[], criteria: ReportCri
   const counts: Record<Verdict, number> = { aligned: 0, partial: 0, gap: 0, not_addressed: 0 };
   for (const r of rows) counts[r.verdict]++;
 
-  const total = rows.length || 1;
-  const score = Math.round(
-    rows.reduce((s, r) => s + VERDICT_SCORE[r.verdict], 0) / total,
-  );
+  const score = alignmentScore(rows.map((r) => r.verdict));
+  const recommendation = recommendationFromCounts(counts);
 
-  // Group by category (agent).
-  const byCat = new Map<string, typeof rows>();
+  const byCat = new Map<string, ReportRow[]>();
   for (const r of rows) {
     const arr = byCat.get(r.category) ?? [];
     arr.push(r);
     byCat.set(r.category, arr);
   }
 
-  const categories = Array.from(byCat.entries()).map(([cat, items]) => {
-    const c: Record<Verdict, number> = { aligned: 0, partial: 0, gap: 0, not_addressed: 0 };
-    for (const it of items) c[it.verdict]++;
-    const s = Math.round(items.reduce((sum, it) => sum + VERDICT_SCORE[it.verdict], 0) / items.length);
-    return { category: cat, items, counts: c, score: s, total: items.length };
-  }).sort((a, b) => a.category.localeCompare(b.category));
-
-  const recommendation =
-    counts.gap > 0
-      ? { kind: "reject" as const, headline: "Do not sign", reason: `${counts.gap} critical gap(s) block the contract.` }
-      : counts.partial > 0
-      ? { kind: "negotiate" as const, headline: "Negotiate before signing", reason: `${counts.partial} partial match(es) need clarification.` }
-      : { kind: "sign" as const, headline: "Safe to sign", reason: "All evaluated criteria are aligned with the customer template." };
+  const categories = Array.from(byCat.entries())
+    .map(([cat, items]) => {
+      const c: Record<Verdict, number> = { aligned: 0, partial: 0, gap: 0, not_addressed: 0 };
+      for (const it of items) c[it.verdict]++;
+      return {
+        category: cat,
+        items,
+        counts: c,
+        score: alignmentScore(items.map((it) => it.verdict)),
+        total: items.length,
+      };
+    })
+    .sort((a, b) => a.category.localeCompare(b.category));
 
   return { rows, counts, total: rows.length, score, categories, recommendation };
 }

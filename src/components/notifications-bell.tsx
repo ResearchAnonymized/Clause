@@ -94,7 +94,7 @@ export function NotificationsBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-4 w-4" />
           {unread > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] rounded-full bg-brand text-white">
+            <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] rounded-full bg-brand text-brand-foreground">
               {unread > 9 ? "9+" : unread}
             </Badge>
           )}

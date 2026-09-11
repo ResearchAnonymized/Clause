@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
+import { ProductMark } from "@/components/product-mark";
+import { PublicControls } from "@/components/public-controls";
 
 type Search = { token?: string };
 
@@ -60,7 +62,12 @@ function AcceptInvitePage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-screen bg-paper text-foreground">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <ProductMark />
+          <PublicControls />
+        </header>
+        <div className="flex items-center justify-center p-6 min-h-[calc(100vh-4.25rem)]">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle>Invalid invite</CardTitle>
@@ -72,12 +79,18 @@ function AcceptInvitePage() {
             </Button>
           </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-muted/20">
+    <div className="min-h-screen bg-paper text-foreground">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <ProductMark />
+        <PublicControls />
+      </header>
+      <div className="flex items-center justify-center p-6 min-h-[calc(100vh-4.25rem)]">
       <Card className="max-w-md w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -99,8 +112,8 @@ function AcceptInvitePage() {
           )}
           {!user && peek?.ok && (
             <Button asChild className="w-full">
-              <Link to="/auth" search={{ redirect: `/invite/accept?token=${token}` } as any}>
-                Sign in to accept
+              <Link to="/auth" search={{ invite: token, tab: "signup" }}>
+                Create account or sign in to accept
               </Link>
             </Button>
           )}
@@ -116,6 +129,7 @@ function AcceptInvitePage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

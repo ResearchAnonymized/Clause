@@ -4,7 +4,7 @@
  */
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
-import { createAiProvider } from "@/lib/ai-gateway.server";
+import { createAiProvider, routedModelFromResult } from "@/lib/ai-gateway.server";
 import {
   DEFAULT_CLAUSE_MAPPING_PROMPT,
   DEFAULT_GAP_ANALYSIS_PROMPT,
@@ -36,7 +36,7 @@ async function generateJson<T>(
       output: Output.object({ schema }),
     });
     recordLlmUsage({
-      model: modelId,
+      model: routedModelFromResult(result, modelId),
       usage: result.usage,
       agent_name: usageMeta?.agent_name,
       stage: usageMeta?.stage,
@@ -206,6 +206,7 @@ export async function runGapAnalysis(params: {
     justification: string;
   }>;
   pairs: ClausePair[];
+  packContext?: { bidderFiles?: string[]; tenderFiles?: string[] } | null;
 }): Promise<GapFinding[]> {
   const prompts = resolvePrompts(params.prompts);
   const fsummary =
@@ -221,6 +222,12 @@ export async function runGapAnalysis(params: {
     params.model,
     prompts.gap_analysis,
     [
+      params.packContext?.bidderFiles?.length
+        ? `BIDDER FILES: ${params.packContext.bidderFiles.join(", ")}`
+        : "",
+      params.packContext?.tenderFiles?.length
+        ? `TENDER FILES: ${params.packContext.tenderFiles.join(", ")}`
+        : "",
       "SPECIALIST FINDINGS:",
       fsummary,
       "",
@@ -234,13 +241,15 @@ export async function runGapAnalysis(params: {
         })),
       ),
       "",
-      "Return the JSON described in the system message.",
-    ].join("\n"),
+      "Return the JSON described in the system message. If nothing pack-specific remains, return {\"gaps\":[]}.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     GapSchema,
     { agent_name: "Gap Analysis", stage: "gap" },
   );
 
-  return (out?.gaps ?? []).slice(0, 5).map((g) => ({
+  return (out?.gaps ?? []).slice(0, 3).map((g) => ({
     title: String(g.title || "Gap").slice(0, 160),
     severity: g.severity,
     justification: String(g.justification || "").slice(0, 2000) || "No justification.",

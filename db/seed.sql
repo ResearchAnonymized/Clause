@@ -1,10 +1,18 @@
--- Default criteria library (workspace-agnostic seed)
+-- Default criteria libraries (workspace-agnostic seed)
+INSERT INTO public.criteria_sets (id, name, description, is_default)
+VALUES (
+  '00000000-0000-0000-0000-000000000002',
+  'Commercial contract review',
+  'Default library for comparing a reference pack (tender, RFP, or contract) against a response pack (bid, MSA, or vendor draft).',
+  true
+);
+
 INSERT INTO public.criteria_sets (id, name, description, is_default)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
-  'Welfare Region Default',
-  'Baseline criteria derived from 2M-IT test cases (SLA, notice, DPA, pricing).',
-  true
+  'Finnish public procurement',
+  'Optional library shaped for Finnish public-procurement annexes (SLA, notice, DPA, pricing).',
+  false
 );
 
 INSERT INTO public.criteria (set_id, name, category, description, prompt, model, severity_default, sort_order) VALUES
@@ -35,4 +43,34 @@ INSERT INTO public.criteria (set_id, name, category, description, prompt, model,
 ('00000000-0000-0000-0000-000000000001', 'Information security baseline', 'Infosec',
  'Do supplier terms meet the customer/organisation infosec baseline?',
  'Assess the supplier''s information-security commitments (ISO 27001, SOC 2, encryption, incident notification timelines, sub-processor disclosure) against the customer contract''s minimum requirements. Return severity=critical for missing mandatory controls, warning for weak commitments, ok for full alignment.',
+ 'gpt-4o-mini', 'critical', 7);
+
+INSERT INTO public.criteria (set_id, name, category, description, prompt, model, severity_default, sort_order) VALUES
+('00000000-0000-0000-0000-000000000002', 'SLA existence', 'SLA',
+ 'Does the response commit to a service level for the offered service?',
+ 'You are a contract reviewer. Decide whether the RESPONSE pack states a service level (availability, support hours, or equivalent) for the service being bought. If MISSING return severity=critical. If PRESENT return severity=ok. Cite a short evidence quote from this pack.',
+ 'gpt-4o-mini', 'critical', 1),
+('00000000-0000-0000-0000-000000000002', 'SLA level comparison', 'SLA',
+ 'Does the offered service level meet the reference requirement?',
+ 'Compare the service level required in the REFERENCE pack with the level offered in the RESPONSE pack (availability %, severity response times, credits). Return severity=critical if the offer is weaker, warning if comparable but incomplete, ok if it meets or exceeds. Cite both sides.',
+ 'gpt-4o-mini', 'critical', 2),
+('00000000-0000-0000-0000-000000000002', 'Notice period alignment', 'Termination',
+ 'Can the buyer exit on terms that match what they promised downstream?',
+ 'Extract termination / notice periods from REFERENCE and RESPONSE. Return severity=critical if the supplier notice is longer than the buyer can give their own customer, warning if they differ with limited exposure, ok if they align.',
+ 'gpt-4o-mini', 'critical', 3),
+('00000000-0000-0000-0000-000000000002', 'DPA appendix presence', 'DPA',
+ 'Is personal-data processing covered by a DPA or equivalent annex?',
+ 'Check whether the packs include a data processing agreement or equivalent description of personal-data processing for the service. Return severity=critical if missing, warning if present but incomplete, ok if covered. Cite this pack.',
+ 'gpt-4o-mini', 'critical', 4),
+('00000000-0000-0000-0000-000000000002', 'Pricing appendix presence', 'Pricing',
+ 'Is there a clear price schedule for the offered service?',
+ 'Check the RESPONSE pack for a pricing table, rate card, or commercial appendix covering the service. Return severity=critical if pricing cannot be identified, warning if present but incomplete, ok if a schedule exists. Cite this pack.',
+ 'gpt-4o-mini', 'critical', 5),
+('00000000-0000-0000-0000-000000000002', 'Price adjustment mechanism', 'Pricing',
+ 'Can the supplier raise prices under terms the buyer cannot recover?',
+ 'Compare price-adjustment terms in REFERENCE and RESPONSE. Return severity=critical if the supplier can raise prices under conditions the buyer cannot pass on, warning if mechanisms differ with limited exposure, ok if they mirror.',
+ 'gpt-4o-mini', 'warning', 6),
+('00000000-0000-0000-0000-000000000002', 'Information security baseline', 'Infosec',
+ 'Do security commitments meet the reference baseline?',
+ 'Assess information-security commitments (certifications, encryption, incident notification, sub-processor disclosure) in the RESPONSE against the REFERENCE minimum. Return severity=critical for missing mandatory controls, warning for weak commitments, ok for alignment. Cite this pack.',
  'gpt-4o-mini', 'critical', 7);

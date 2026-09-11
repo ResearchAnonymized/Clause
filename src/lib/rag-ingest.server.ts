@@ -72,16 +72,21 @@ export function chunkFromAst(ast: ClauseDocumentAst, fallbackText: string): stri
 }
 
 async function embedBatch(inputs: string[]): Promise<{ vectors: number[][]; usageTokens: number }> {
-  const key = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
+  const key =
+    process.env.AI_EMBEDDING_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
   if (!key) throw new Error("AI_API_KEY (or OPENAI_API_KEY) not configured");
-  const base = (process.env.AI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const base = (
+    process.env.AI_EMBEDDING_BASE_URL ||
+    process.env.AI_BASE_URL ||
+    "https://api.openai.com/v1"
+  ).replace(/\/+$/, "");
   const headers: Record<string, string> = {
     "content-type": "application/json",
     authorization: `Bearer ${key}`,
   };
   if (base.includes("openrouter.ai")) {
     headers["HTTP-Referer"] = process.env.APP_URL || "http://localhost:3000";
-    headers["X-Title"] = "Clause";
+    headers["X-Title"] = "Counterpart";
   }
   const res = await fetch(`${base}/embeddings`, {
     method: "POST",

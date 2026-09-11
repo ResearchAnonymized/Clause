@@ -1,27 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_CONTACT } from "@/lib/legal-content";
+import { legalContact } from "@/lib/legal-content";
+import { PRODUCT_NAME } from "@/config/instance";
 
 export const Route = createFileRoute("/dpa")({
   head: () => ({
     meta: [
-      { title: "Data Processing — Clause" },
-      { name: "description", content: "Data processing terms and current sub-processors for the Clause contract-review service." },
-      { property: "og:title", content: "Data Processing — Clause" },
-      { property: "og:description", content: "Data processing terms and sub-processors used by Clause." },
+      { title: `Data Processing — ${PRODUCT_NAME}` },
+      { name: "description", content: `Data processing terms and current sub-processors for ${PRODUCT_NAME}.` },
+      { property: "og:title", content: `Data Processing — ${PRODUCT_NAME}` },
+      { property: "og:description", content: `Data processing terms and sub-processors used by ${PRODUCT_NAME}.` },
       { property: "og:type", content: "article" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: () => (
+  component: () => {
+    const contact = legalContact();
+    return (
     <LegalPage
       title="Data processing"
-      intro="Clause processes uploaded contracts on behalf of 2M-IT as data processor. This page summarises the processing terms and lists current sub-processors."
+      intro={`${PRODUCT_NAME} processes uploaded documents on behalf of your organization as data processor. This page summarises the processing terms and lists current sub-processors.`}
     >
       <h2>Subject matter</h2>
       <p>
-        Processing of supplier contracts, customer templates and reviewer activity to produce
-        clause-level analyses, negotiation checklists and signed decision records.
+        Processing of reference packs, response packs and reviewer activity to produce
+        requirement-level analyses, negotiation checklists and signed decision records.
       </p>
 
       <h2>Nature and purpose</h2>
@@ -32,7 +35,7 @@ export const Route = createFileRoute("/dpa")({
       </ul>
 
       <h2>Categories of data subjects</h2>
-      <p>Reviewers, approvers and any individuals named in uploaded contracts.</p>
+      <p>Reviewers, approvers and any individuals named in uploaded documents.</p>
 
       <h2>Sub-processors</h2>
       <table>
@@ -41,14 +44,10 @@ export const Route = createFileRoute("/dpa")({
         </thead>
         <tbody>
           <tr><td>Self-hosted PostgreSQL</td><td>Database and sessions</td><td>Customer-controlled</td></tr>
-          <tr><td>MinIO / S3-compatible storage</td><td>Contract document storage</td><td>Customer-controlled</td></tr>
+          <tr><td>MinIO / S3-compatible storage</td><td>Document storage</td><td>Customer-controlled</td></tr>
           <tr><td>OpenAI-compatible LLM API</td><td>LLM inference for agent analysis</td><td>Per provider configuration</td></tr>
-          <tr><td>Python analysis worker</td><td>LangGraph orchestration</td><td>Customer-controlled</td></tr>
         </tbody>
       </table>
-      <p className="text-xs">
-        Workspace admins are notified in-app before a new sub-processor is added.
-      </p>
 
       <h2>International transfers</h2>
       <p>
@@ -61,10 +60,11 @@ export const Route = createFileRoute("/dpa")({
 
       <h2>Data subject requests</h2>
       <p>
-        Requests are handled by <a href={`mailto:${LEGAL_CONTACT.email}`}>{LEGAL_CONTACT.email}</a>.
+        Requests are handled by {contact.email ? <a href={`mailto:${contact.email}`}>{contact.email}</a> : contact.emailDisplay}.
         Reviewers can also self-serve data export and deletion from
         <em> Settings → Privacy &amp; Data</em>.
       </p>
     </LegalPage>
-  ),
+    );
+  },
 });

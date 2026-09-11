@@ -5,10 +5,30 @@ on:
   push:
     branches: [main]
 
+env:
+  DATABASE_URL: postgres://clause:clause@localhost:5432/clause
+  SESSION_SECRET: ci-session-secret-not-for-prod
+  AUTH_SIGNUP_MODE: open
+  APP_URL: http://localhost:4173
+
 jobs:
   typecheck-and-test:
-    name: Typecheck & Tests
+    name: Unit, DB, and browser smokes
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: clause
+          POSTGRES_PASSWORD: clause
+          POSTGRES_DB: clause
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clause -d clause"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +44,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Full `tsc` still has pre-existing app-wide debt; keep CI green on unit tests.
-      - name: Run vitest
-        run: pnpm run test
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Apply schema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
+          bash deploy/apply-migrations.sh
+
+      - name: Postgres integration tests
+        run: pnpm test:db
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser smokes
+        run: pnpm test:e2e

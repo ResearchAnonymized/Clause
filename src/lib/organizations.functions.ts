@@ -12,7 +12,7 @@ import {
   createOrganizationInvite,
   provisionOrganizationForUser,
 } from "@/lib/organizations.server";
-import type { OrganizationRole } from "@/lib/organizations";
+import { parseInviteInput, type OrganizationRole } from "@/lib/organizations";
 
 const OrgId = z.object({ organizationId: z.string().uuid() });
 
@@ -138,10 +138,24 @@ export const inviteToOrganization = createServerFn({ method: "POST" })
     });
     const origin = process.env.APP_URL || "http://localhost:3000";
     const acceptUrl = `${origin}/invite/accept?token=${token}`;
+    const { sendMail } = await import("@/lib/mailer.server");
+    const { PRODUCT_NAME } = await import("@/config/instance");
+    await sendMail({
+      to: data.email,
+      subject: `Join ${data.role} · ${PRODUCT_NAME} invite`,
+      text: `You have been invited to an organization on ${PRODUCT_NAME} as ${data.role}.\n\nAccept the invite:\n${acceptUrl}\n\nThis link expires in 14 days.`,
+    });
+    const { recordAuthEvent } = await import("@/lib/auth/events");
+    await recordAuthEvent({
+      event: "invite_sent",
+      userId,
+      email: data.email,
+      meta: { organizationId: data.organizationId, role: data.role },
+    });
     return { inviteId, expiresAt: expiresAt.toISOString(), acceptUrl, token };
   });
 
-const AcceptInvite = z.object({ token: z.string().min(16) });
+const AcceptInvite = z.object({ token: z.string().min(1) });
 
 export const acceptInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -152,7 +166,7 @@ export const acceptInvite = createServerFn({ method: "POST" })
       session: { user: { email: string } };
     };
     return acceptOrganizationInvite({
-      token: data.token,
+      token: parseInviteInput(data.token),
       userId,
       userEmail: session.user.email,
     });
@@ -164,11 +178,12 @@ export const peekInvite = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const sql = getSql();
     const { hashInviteToken } = await import("@/lib/organizations.server");
+    const token = parseInviteInput(data.token);
     const rows = await sql`
       SELECT i.email, i.role, i.expires_at, i.accepted_at, i.revoked_at, o.name AS org_name
       FROM organization_invites i
       JOIN organizations o ON o.id = i.organization_id
-      WHERE i.token_hash = ${hashInviteToken(data.token)}
+      WHERE i.token_hash = ${hashInviteToken(token)}
       LIMIT 1
     `;
     const row = rows[0];

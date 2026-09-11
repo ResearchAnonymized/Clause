@@ -26,3 +26,11 @@ export async function sqlHealthcheck(): Promise<{ ok: boolean; latencyMs: number
     return { ok: false, latencyMs: Date.now() - t0 };
   }
 }
+
+/** Close the shared pool (integration tests). Safe to call if never opened. */
+export async function closeSql() {
+  if (!_sql) return;
+  const sql = _sql;
+  _sql = undefined;
+  await sql.end({ timeout: 5 });
+}

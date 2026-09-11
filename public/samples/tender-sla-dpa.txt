@@ -1,0 +1,23 @@
+ANNEX B — SERVICE LEVELS AND DATA PROTECTION
+Sample tender annex for training (not a live procurement)
+
+A. Service levels
+A.1 Monthly availability target: 99.9%.
+A.2 Priority-1 restore time: 4 hours.
+A.3 Priority-2 restore time: 8 hours (business hours).
+A.4 Planned maintenance: maximum 4 hours per calendar month, weekend windows only, 14 days' notice.
+A.5 Reporting: monthly SLA report by the 5th business day.
+
+B. Personal data (GDPR)
+B.1 Roles. The customer is controller; the supplier is processor for the case-management production environment.
+B.2 Categories. Special-category health and social-care data of residents in the wellbeing services county.
+B.3 Location. Processing SHALL take place in the European Economic Area. Transfers outside the EEA require prior written approval and a valid transfer mechanism.
+B.4 Breach notification. The processor SHALL notify the controller of a personal-data breach without undue delay and no later than 24 hours after becoming aware of it.
+B.5 Sub-processors. Written 30-day prior notice; customer may object on reasonable GDPR grounds.
+B.6 Assistance. The processor SHALL assist with data-subject requests within 5 business days.
+
+C. Information security
+C.1 ISO/IEC 27001 certification (or equivalent ISMS) SHALL be maintained for the term.
+C.2 Encryption in transit (TLS 1.2+) and at rest.
+C.3 Privileged access: MFA, named accounts, quarterly access review.
+C.4 Vulnerability management: critical findings remediated within 14 days.

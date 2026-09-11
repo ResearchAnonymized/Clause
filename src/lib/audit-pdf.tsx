@@ -21,26 +21,36 @@ import {
 import { computeReportData, type ReportFinding, type ReportCriterion } from "@/lib/report-data";
 import type { Verdict } from "@/lib/verdict";
 
-// ---------- Fonts (Google Fonts static URLs — Node/edge safe from browser) ----------
-Font.register({
-  family: "EBGaramond",
-  fonts: [
-    { src: "https://fonts.gstatic.com/s/ebgaramond/v27/SlGDmQSNjdsmc35JDF1K5FRyRQ.ttf", fontWeight: 400 },
-    { src: "https://fonts.gstatic.com/s/ebgaramond/v27/SlGFmQSNjdsmc35JDF1K5E55YMjF_wLQ.ttf", fontWeight: 500 },
-    { src: "https://fonts.gstatic.com/s/ebgaramond/v27/SlGFmQSNjdsmc35JDF1K5FprYMjF_wLQ.ttf", fontWeight: 700 },
-    { src: "https://fonts.gstatic.com/s/ebgaramond/v27/SlGCmQSNjdsmc35JDF1K5GRwUjcdlttVFm0.ttf", fontWeight: 400, fontStyle: "italic" },
-  ],
-});
-Font.register({
-  family: "InterUI",
-  fonts: [
-    { src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.ttf", fontWeight: 400 },
-    { src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7.ttf", fontWeight: 600 },
-    { src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1pL7.ttf", fontWeight: 700 },
-  ],
-});
-// Prevent hyphenation splitting words in narrow columns.
-Font.registerHyphenationCallback((word) => [word]);
+function pdfFontUrl(file: string): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/fonts/${file}`;
+  }
+  return `/fonts/${file}`;
+}
+
+let pdfFontsRegistered = false;
+function registerPdfFonts() {
+  if (pdfFontsRegistered) return;
+  Font.register({
+    family: "EBGaramond",
+    fonts: [
+      { src: pdfFontUrl("EBGaramond-Regular.ttf"), fontWeight: 400 },
+      { src: pdfFontUrl("EBGaramond-Medium.ttf"), fontWeight: 500 },
+      { src: pdfFontUrl("EBGaramond-Bold.ttf"), fontWeight: 700 },
+      { src: pdfFontUrl("EBGaramond-Italic.ttf"), fontWeight: 400, fontStyle: "italic" },
+    ],
+  });
+  Font.register({
+    family: "InterUI",
+    fonts: [
+      { src: pdfFontUrl("Inter-Regular.ttf"), fontWeight: 400 },
+      { src: pdfFontUrl("Inter-SemiBold.ttf"), fontWeight: 600 },
+      { src: pdfFontUrl("Inter-Bold.ttf"), fontWeight: 700 },
+    ],
+  });
+  Font.registerHyphenationCallback((word) => [word]);
+  pdfFontsRegistered = true;
+}
 
 // ---------- Design tokens ----------
 const NAVY = "#0B1E3F";
@@ -302,7 +312,7 @@ function CoverPage(props: AuditPdfInput) {
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>REPORT ID</Text><Text style={S.coverMetaVal}>{props.reportId}</Text></View>
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>CLIENT</Text><Text style={S.coverMetaVal}>{props.clientName}</Text></View>
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>SUPPLIER</Text><Text style={S.coverMetaVal}>{props.supplierName || "—"}</Text></View>
-        <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>PREPARED BY</Text><Text style={S.coverMetaVal}>{props.preparedBy || "Clause — Contract Intelligence"}</Text></View>
+        <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>PREPARED BY</Text><Text style={S.coverMetaVal}>{props.preparedBy || "Counterpart — Contract Intelligence"}</Text></View>
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>ISSUED</Text><Text style={S.coverMetaVal}>{fmtDate(props.preparedAt)}</Text></View>
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>DOCUMENT HASH</Text><Text style={S.coverMetaVal}>SHA-256 · {shortHash(props.docSha256)}</Text></View>
       </View>
@@ -783,7 +793,7 @@ function AppendixDocs(props: AuditPdfInput & { sectionNo: string }) {
 export function AuditPdfDocument(props: AuditPdfInput) {
   const headerLeft = `Confidential  ·  ${props.clientName}  ·  ${props.supplierName || "Supplier"}`;
   const headerRight = props.reportId;
-  const footerLeft = `Clause — Contract Intelligence  ·  ${shortHash(props.docSha256)}`;
+  const footerLeft = `Counterpart — Contract Intelligence  ·  ${shortHash(props.docSha256)}`;
   const hasDecision = !!props.decision;
   const hasNegotiation = (props.negotiationItems?.length ?? 0) > 0;
 
@@ -792,7 +802,7 @@ export function AuditPdfDocument(props: AuditPdfInput) {
   const secNo = (i: number) => String(baseAfterDecision + i - 1).padStart(2, "0");
 
   return (
-    <Document title={`${props.engagementTitle} — Audit Report`} author="Clause — Contract Intelligence" subject="Supplier contract compliance audit">
+    <Document title={`${props.engagementTitle} — Audit Report`} author="Counterpart — Contract Intelligence" subject="Supplier contract compliance audit">
       <CoverPage {...props} />
       <Page size="A4" style={S.page}>
         <RunningChrome headerLeft={headerLeft} headerRight={headerRight} footerLeft={footerLeft} />
@@ -848,6 +858,7 @@ export function AuditPdfDocument(props: AuditPdfInput) {
 
 // ---------- Public API ----------
 export async function renderAuditPdfBlob(input: AuditPdfInput): Promise<Blob> {
+  registerPdfFonts();
   return await pdf(<AuditPdfDocument {...input} />).toBlob();
 }
 

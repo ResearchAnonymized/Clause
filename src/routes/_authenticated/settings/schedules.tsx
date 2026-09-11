@@ -16,7 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/settings/schedules")({
-  head: () => ({ meta: [{ title: "Schedules — Clause" }] }),
+  head: () => ({ meta: [{ title: "Schedules — Counterpart" }] }),
   component: SchedulesPage,
 });
 

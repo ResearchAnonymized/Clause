@@ -19,9 +19,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Cpu, ExternalLink, KeyRound, Cloud, HardDrive, Sparkles } from "lucide-react";
 import {
+  AUTO_COST_TIER_LABELS,
+  AUTO_COST_TIERS,
   DEFAULT_LLM_CONFIG,
   OPENROUTER_MODELS,
   PROVIDER_PRESETS,
+  formatModelLabel,
+  isAutoRouterModel,
+  mergeLlmConfig,
+  normalizeCostTier,
+  type AutoCostTier,
   type LlmConfig,
   type LlmProvider,
 } from "@/lib/agent-defaults";
@@ -29,7 +36,7 @@ import { listAvailableModels, testLlmConnection } from "@/lib/llm.functions";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/settings/llm")({
-  head: () => ({ meta: [{ title: "AI Models — Clause" }] }),
+  head: () => ({ meta: [{ title: "AI Models — Counterpart" }] }),
   component: LlmSettingsPage,
 });
 
@@ -58,9 +65,9 @@ function LlmSettingsPage() {
       const raw = ((data?.llm_config as unknown) as LlmConfig) ?? DEFAULT_LLM_CONFIG;
       // Migrate removed "lovable" provider id
       if ((raw as any).provider === "lovable") {
-        return { ...DEFAULT_LLM_CONFIG, model: raw.model || DEFAULT_LLM_CONFIG.model };
+        return mergeLlmConfig({ ...DEFAULT_LLM_CONFIG, model: raw.model || DEFAULT_LLM_CONFIG.model });
       }
-      return { ...DEFAULT_LLM_CONFIG, ...raw };
+      return mergeLlmConfig(raw);
     },
   });
 
@@ -76,7 +83,7 @@ function LlmSettingsPage() {
   const [customModel, setCustomModel] = useState("");
 
   useEffect(() => {
-    if (data) setConfig({ ...DEFAULT_LLM_CONFIG, ...data });
+    if (data) setConfig(mergeLlmConfig(data));
   }, [data]);
 
   const preset = PROVIDER_PRESETS[config.provider] ?? PROVIDER_PRESETS.openrouter;
@@ -87,6 +94,7 @@ function LlmSettingsPage() {
       // Keep curated first, then a useful slice of live catalogue
       for (const id of liveModels.models) {
         if (
+          id.startsWith("openrouter/") ||
           id.startsWith("openai/") ||
           id.startsWith("anthropic/") ||
           id.startsWith("google/") ||
@@ -111,6 +119,10 @@ function LlmSettingsPage() {
       base_url: config.base_url?.trim() || null,
       api_key_secret_name: config.api_key_secret_name?.trim() || null,
       model: config.model.trim() || DEFAULT_LLM_CONFIG.model,
+      extra: {
+        ...(config.extra ?? {}),
+        cost_tier: normalizeCostTier(config.extra?.cost_tier),
+      },
     };
     const { error } = await supabase
       .from("workspaces")
@@ -126,11 +138,20 @@ function LlmSettingsPage() {
     if (!config.model) return toast.error("Pick a model first");
     setTesting(true);
     try {
-      const result = await testLlmConnection({ data: { model: config.model } });
+      const result = await testLlmConnection({
+        data: {
+          model: config.model,
+          cost_tier: normalizeCostTier(config.extra?.cost_tier),
+        },
+      });
       if (!result.ok) {
         toast.error(result.error || "Connection failed");
       } else {
-        toast.success(`Connected · ${result.model} → “${result.reply}”`);
+        toast.success(
+          result.routed && result.routed !== result.model
+            ? `Connected · ${result.model} routed to ${result.routed} → “${result.reply}”`
+            : `Connected · ${result.model} → “${result.reply}”`,
+        );
       }
     } catch (err: any) {
       toast.error(String(err?.message ?? err));
@@ -241,7 +262,7 @@ function LlmSettingsPage() {
                 <SelectContent className="max-h-72">
                   {modelOptions.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {m}
+                      {formatModelLabel(m)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -307,6 +328,39 @@ function LlmSettingsPage() {
             </div>
           </div>
 
+          {config.provider === "openrouter" && isAutoRouterModel(config.model) && (
+            <div className="space-y-1.5 pt-2">
+              <Label>Auto Router cost tier</Label>
+              <Select
+                value={normalizeCostTier(config.extra?.cost_tier)}
+                onValueChange={(v) =>
+                  setConfig((c) => ({
+                    ...c,
+                    extra: { ...c.extra, cost_tier: v as AutoCostTier },
+                  }))
+                }
+                disabled={!canEdit}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTO_COST_TIERS.map((tier) => (
+                    <SelectItem key={tier} value={tier}>
+                      {AUTO_COST_TIER_LABELS[tier]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                OpenRouter classifies each prompt and picks the model the market spends on for that
+                task. You pay the routed model&apos;s price — there is no Auto Router surcharge.
+                Embeddings stay on <code>AI_EMBEDDING_MODEL</code>; scanned-PDF OCR stays on a vision
+                model.
+              </p>
+            </div>
+          )}
+
           {config.provider !== "openrouter" && (preset?.requiresApiKey || config.provider === "openai_compatible") && (
             <div className="space-y-1.5 pt-2">
               <Label className="flex items-center gap-1.5">
@@ -339,10 +393,12 @@ function LlmSettingsPage() {
         <AlertTitle>How model selection works</AlertTitle>
         <AlertDescription className="text-sm space-y-1">
           <p>
-            The workspace default model (this page) is used for every criterion unless a criterion
-            overrides it in the Criteria Library.
+            Default is <strong>Auto Router</strong> (<code>openrouter/auto</code>). Each specialist
+            prompt is classified and routed to the model the OpenRouter community spends on for that
+            kind of task (updated on a 7-day window).
           </p>
           <p>
+            You can still pin a specific model here, or override one criterion in the Criteria Library.
             API keys stay in <code>.env</code> on the server — they are never stored in the database.
           </p>
         </AlertDescription>

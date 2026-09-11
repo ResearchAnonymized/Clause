@@ -9,10 +9,13 @@ import {
   BookOpen, Rocket, FileSearch, BookMarked, Bot, Activity, ScrollText, Users,
   Shield, Search, Sparkles, KeyRound, HelpCircle, CalendarClock, Webhook,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { resetOnboarding } from "@/components/onboarding-tour";
+import { ProductTourStartButton } from "@/components/product-tour";
 
 export const Route = createFileRoute("/_authenticated/settings/help")({
-  head: () => ({ meta: [{ title: "Help & Documentation · Clause" }] }),
+  head: () => ({ meta: [{ title: "Help & Documentation · Counterpart" }] }),
   component: HelpPage,
 });
 
@@ -24,7 +27,7 @@ const sections = [
     body: (
       <ol className="space-y-2 text-sm text-muted-foreground list-decimal pl-5">
         <li>Open <Link to="/runs/new" className="text-primary underline">New analysis</Link> and upload a supplier contract (PDF / DOCX / TXT).</li>
-        <li>Pick the criteria set (Cases 1–5 ship by default).</li>
+        <li>Pick a criteria set — Commercial contract review is the default; Finnish public procurement is an optional library.</li>
         <li>Watch the specialist agents work in real time on the run page.</li>
         <li>Review the Top-3 risks summary and export a PDF/CSV report.</li>
       </ol>
@@ -105,7 +108,7 @@ const sections = [
     body: (
       <p className="text-sm text-muted-foreground">
         Paste an incoming webhook URL under{" "}
-        <Link to="/settings/workspace" className="text-primary underline">Workspace settings</Link>. Clause posts
+        <Link to="/settings/workspace" className="text-primary underline">Workspace settings</Link>. Counterpart posts
         a message every time an analysis finishes, colour-coded by severity.
       </p>
     ),
@@ -150,7 +153,8 @@ const faqs = [
   { q: "Can I switch the underlying LLM?", a: "Yes. The worker uses LiteLLM — set the model per criterion or globally in worker settings." },
   { q: "What is a prompt A/B variant?", a: "Two prompts for one criterion. The system routes half of the findings through each so you can compare quality/cost." },
   { q: "How do I invite teammates?", a: "Settings → Workspace → Invite member. They receive a signup link scoped to your workspace." },
-  { q: "Can I re-run the product tour?", a: "Settings → Restart product tour." },
+  { q: "Can I take a tour of the system?", a: "Yes, any time: map icon in the header, Tour the product in the sidebar, your profile menu, Settings, or Help." },
+  { q: "Can I re-run getting started?", a: "Settings → Replay getting started, or Help. That restores the first-run checklist; it is separate from the product tour." },
 ];
 
 function HelpPage() {
@@ -168,13 +172,21 @@ function HelpPage() {
         <header className="space-y-2">
           <PageBack label="Back to settings" fallback={{ to: "/settings" }} />
           <PageBreadcrumbs items={[{ label: "Settings", to: "/settings" }, { label: "Help" }]} />
-          <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-            <BookOpen className="h-3.5 w-3.5" /> Documentation
+          <div data-tour-stage="help" className="space-y-2">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <BookOpen className="h-3.5 w-3.5" /> Documentation
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight">Help & Documentation</h1>
+            <p className="text-muted-foreground max-w-2xl">
+              Everything you need to run Counterpart — from first upload to enterprise rollout.
+            </p>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Help & Documentation</h1>
-          <p className="text-muted-foreground max-w-2xl">
-            Everything you need to run Clause — from first upload to enterprise rollout.
-          </p>
+          <div className="pt-1 flex flex-wrap gap-2">
+            <ProductTourStartButton variant="default" size="sm" />
+            <Button variant="outline" size="sm" onClick={() => void resetOnboarding()}>
+              Replay getting started
+            </Button>
+          </div>
           <div className="relative max-w-md pt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -264,7 +276,7 @@ function HelpPage() {
               <CardDescription>Reach the maintainers.</CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Contact your workspace owner or the Clause admin listed under{" "}
+              Contact your workspace owner or the Counterpart admin listed under{" "}
               <Link to="/admin" className="text-primary underline">Users & Roles</Link>.
             </CardContent>
           </Card>

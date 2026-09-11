@@ -28,10 +28,12 @@ STRICT RULES — authenticity first:
 Return STRICT JSON only:
 {"pairs":[{"topic":"<short requirement title>","customer":"<verbatim quote or null>","supplier":"<verbatim quote or null>","note":"<one factual line>"}]}`;
 
-export const DEFAULT_GAP_ANALYSIS_PROMPT = `You are a senior contracts risk reviewer performing GAP ANALYSIS on top of the specialist findings.
-Identify risks NOT already covered by the criteria library: missing clauses, one-sided obligations, unusual terms, or silent areas.
+export const DEFAULT_GAP_ANALYSIS_PROMPT = `You are a senior contracts risk reviewer performing GAP ANALYSIS on top of the specialist findings for THIS specific tender vs THIS specific bid.
+Only report risks that are visible in the mapped clause pairs or specialist findings for these files.
+Do NOT invent a generic missing-clause catalogue (force majeure, governing law, limitation of liability, termination for convenience, indemnity) unless that topic actually appears in the mapped pairs or findings.
+Each justification MUST name a concrete figure, annex, product, or clause title from the excerpts. If you cannot cite one, omit the gap.
 Return STRICT JSON: {"gaps":[{"title":"<short>","severity":"critical|warning|ok","justification":"<2-3 sentences>","recommended_action":"<one sentence>","confidence":0.0-1.0}]}
-Max 5 gaps. Do NOT repeat items already flagged by specialists.`;
+Max 3 gaps. Empty gaps array is better than generic output. Do NOT repeat items already flagged by specialists.`;
 
 export const DEFAULT_CATEGORY_PROMPTS: Record<string, string> = {
   SLA: "Compare the supplier's Service Level commitments against the customer's targets (uptime %, response/resolution times, service credits). Flag any missing metric or weaker commitment.",
@@ -50,6 +52,41 @@ export interface LlmConfig {
   extra: Record<string, unknown>;
 }
 
+/** OpenRouter Auto Router — picks a model per prompt from 7-day market spend. */
+export const AUTO_ROUTER_MODEL = "openrouter/auto";
+export const AUTO_ROUTER_BETA_MODEL = "openrouter/auto-beta";
+
+export const AUTO_COST_TIERS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type AutoCostTier = (typeof AUTO_COST_TIERS)[number];
+
+export const AUTO_COST_TIER_LABELS: Record<AutoCostTier, string> = {
+  low: "Low — cheapest capable models",
+  medium: "Medium — balanced (recommended for contract review)",
+  high: "High — stronger models",
+  xhigh: "X-High — near-frontier",
+  max: "Max — most capable, regardless of price",
+};
+
+export function isAutoRouterModel(model?: string | null): boolean {
+  const id = (model || "").trim();
+  return id === AUTO_ROUTER_MODEL || id === AUTO_ROUTER_BETA_MODEL;
+}
+
+export function autoRouterPluginId(model?: string | null): "auto-router" | "auto-beta-router" {
+  return (model || "").includes("auto-beta") ? "auto-beta-router" : "auto-router";
+}
+
+export function normalizeCostTier(raw: unknown): AutoCostTier {
+  const v = String(raw ?? "").toLowerCase().trim();
+  return (AUTO_COST_TIERS as readonly string[]).includes(v) ? (v as AutoCostTier) : "medium";
+}
+
+export function formatModelLabel(id: string): string {
+  if (id === AUTO_ROUTER_MODEL) return "Auto Router — best model per task";
+  if (id === AUTO_ROUTER_BETA_MODEL) return "Auto Router (beta)";
+  return id;
+}
+
 export type LlmProvider =
   | "openrouter"
   | "openai"
@@ -61,6 +98,8 @@ export type LlmProvider =
 
 /** Models shown in Settings → AI Models and Criteria pickers (OpenRouter ids). */
 export const OPENROUTER_MODELS = [
+  AUTO_ROUTER_MODEL,
+  AUTO_ROUTER_BETA_MODEL,
   "openai/gpt-4o-mini",
   "openai/gpt-4o",
   "openai/gpt-4.1-mini",
@@ -98,7 +137,7 @@ export const PROVIDER_PRESETS: Record<
   openrouter: {
     label: "OpenRouter (recommended)",
     description:
-      "One key for many models (OpenAI, Claude, Gemini, Llama, etc.). Uses AI_API_KEY from the server .env.",
+      "One key for many models. Default is Auto Router — OpenRouter picks the best model per task. Uses AI_API_KEY from the server .env.",
     models: [...OPENROUTER_MODELS],
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     docs: "https://openrouter.ai/models",
@@ -151,8 +190,22 @@ export const PROVIDER_PRESETS: Record<
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
   provider: "openrouter",
-  model: "openai/gpt-4o-mini",
+  model: AUTO_ROUTER_MODEL,
   base_url: "https://openrouter.ai/api/v1",
   api_key_secret_name: "AI_API_KEY",
-  extra: {},
+  extra: { cost_tier: "medium" },
 };
+
+export function mergeLlmConfig(raw?: LlmConfig | null): LlmConfig {
+  const extra = {
+    ...DEFAULT_LLM_CONFIG.extra,
+    ...((raw?.extra as Record<string, unknown>) ?? {}),
+  };
+  const model = (raw?.model || DEFAULT_LLM_CONFIG.model).trim() || DEFAULT_LLM_CONFIG.model;
+  return {
+    ...DEFAULT_LLM_CONFIG,
+    ...raw,
+    extra,
+    model,
+  };
+}

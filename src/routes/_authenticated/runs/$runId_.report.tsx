@@ -13,17 +13,17 @@ import { Bot, FileText, Download, FileDown, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fi as fiLocale, sv as svLocale } from "date-fns/locale";
 import { exportRunPdf, exportRunCsv } from "@/lib/export-run";
-import { AnalysisReportView } from "@/components/analysis-report-view";
 import { DynamicReport } from "@/components/dynamic-report";
 import { PdfPreviewDialog } from "@/components/pdf-preview-dialog";
 import { toast } from "sonner";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { OnboardingStepMarker } from "@/components/onboarding-step-marker";
 
 
 const dfLocale = (lang: string) => (lang.startsWith("fi") ? fiLocale : lang.startsWith("sv") ? svLocale : undefined);
 
 export const Route = createFileRoute("/_authenticated/runs/$runId_/report")({
-  head: () => ({ meta: [{ title: "Full report — Clause" }] }),
+  head: () => ({ meta: [{ title: "Full report — Counterpart" }] }),
   component: RunDetailPage,
 });
 
@@ -113,6 +113,7 @@ function RunDetailPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+      <OnboardingStepMarker step="opened_report" />
       {/* Header */}
       <div>
         <PageBack
@@ -240,16 +241,15 @@ function RunDetailPage() {
       </Card>
 
       {/* Report */}
-      {run.status === "completed" && !!findings?.length ? (
-        <>
-          <DynamicReport
-            runId={runId}
-            workspaceId={(run as any).workspace_id}
-            findings={(findings ?? []) as any}
-            criteria={(criteria ?? []) as any}
-          />
-          <AnalysisReportView run={run as any} findings={(findings ?? []) as any} criteria={(criteria ?? []) as any} checklist={(checklist ?? []) as any} events={(events ?? []) as any} />
-        </>
+      {run.status === "completed" && !!findings?.length && (criteria || !(run as any).criteria_set_id) ? (
+        <DynamicReport
+          runId={runId}
+          workspaceId={(run as any).workspace_id}
+          findings={(findings ?? []) as any}
+          criteria={(criteria ?? []) as any}
+          documents={(docs ?? []) as any}
+          title={(run.title as string) || ""}
+        />
       ) : (
         <Card>
           <CardHeader><CardTitle>{t("runDetail.findings", { n: findings?.length ?? 0 })}</CardTitle></CardHeader>

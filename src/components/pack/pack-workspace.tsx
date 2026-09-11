@@ -280,6 +280,7 @@ export function PackWorkspace({
               fallbackNeedle={fallbackNeedle}
               severity={severity}
               verdict={verdict}
+              showFilename={false}
             />
           </div>
         </div>
@@ -344,6 +345,7 @@ function ComparePane({
               fallbackNeedle={fallbackNeedle}
               severity={severity}
               verdict={verdict}
+              showFilename={false}
             />
           </div>
         </div>

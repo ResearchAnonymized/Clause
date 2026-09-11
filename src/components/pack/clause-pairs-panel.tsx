@@ -49,22 +49,19 @@ export function ClausePairsTeaser({ runId }: { runId: string }) {
     <Link
       to="/runs/$runId/mapping"
       params={{ runId }}
-      className="block rounded-xl border bg-card overflow-hidden hover:border-brand/40 hover:bg-muted/20 transition-colors group"
+      className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2 hover:border-brand/40 hover:bg-muted/30 transition-colors group"
     >
-      <div className="px-4 py-3 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-brand-soft text-brand grid place-items-center shrink-0">
-          <Link2 className="w-4 h-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">Compliance mapping</div>
-          <div className="text-xs text-muted-foreground truncate">
-            {pairs.length} requirements · source-verified matrix
-            {overridden ? ` · ${overridden} override${overridden === 1 ? "" : "s"}` : ""}
-          </div>
-        </div>
-        <span className="text-xs font-medium tabular-nums text-muted-foreground">{pairs.length}</span>
-        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand transition-colors" />
+      <div className="h-8 w-8 rounded-md bg-brand-soft text-brand grid place-items-center shrink-0">
+        <Link2 className="w-3.5 h-3.5" />
       </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">Compliance mapping</div>
+        <div className="text-xs text-muted-foreground truncate">
+          {pairs.length} requirements
+          {overridden ? ` · ${overridden} override${overridden === 1 ? "" : "s"}` : ""}
+        </div>
+      </div>
+      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand transition-colors" />
     </Link>
   );
 }

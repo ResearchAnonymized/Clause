@@ -1,0 +1,143 @@
+# Production stack: app + Postgres + MinIO + Caddy (HTTPS).
+# Usage on the server:
+#   cp deploy/env.production.example .env
+#   # fill secrets, APP_URL, APP_HOST, POSTGRES_PASSWORD, STORAGE_SECRET_KEY, AI_API_KEY
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# First boot applies db/schema.sql + db/seed.sql. Extra migrate-*.sql files
+# are applied by the migrate service (idempotent).
+
+name: counterpart
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clause
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: clause
+    volumes:
+      - counterpart_pg_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clause -d clause"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Not published. App talks to db:5432 on the compose network.
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-clause}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:?set STORAGE_SECRET_KEY in .env}
+    volumes:
+      - counterpart_minio_data:/data
+    # Not published. App talks to minio:9000 on the compose network.
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    restart: on-failure
+    environment:
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-clause}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?set STORAGE_SECRET_KEY in .env}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-contracts}
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 \"$$STORAGE_ACCESS_KEY\" \"$$STORAGE_SECRET_KEY\";
+      mc mb -p local/$$STORAGE_BUCKET || true;
+      mc anonymous set none local/$$STORAGE_BUCKET;
+      exit 0;
+      "
+
+  migrate:
+    image: pgvector/pgvector:pg16
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./db:/db:ro
+    restart: on-failure
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        echo "Applying additive migrations…"
+        for f in /db/migrate-*.sql; do
+          echo "  $$f"
+          psql -h db -U clause -d clause -v ON_ERROR_STOP=0 -f "$$f"
+        done
+        echo "Migrations done."
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: 3000
+      DATABASE_URL: postgres://clause:${POSTGRES_PASSWORD}@db:5432/clause
+      STORAGE_DRIVER: s3
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_FORCE_PATH_STYLE: "true"
+      STORAGE_REGION: ${STORAGE_REGION:-eu-central-1}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_HOST: ${APP_HOST:?set APP_HOST in .env (hostname only, no https://)}
+    volumes:
+      - ./deploy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - counterpart_caddy_data:/data
+      - counterpart_caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  counterpart_pg_data:
+  counterpart_minio_data:
+  counterpart_caddy_data:
+  counterpart_caddy_config:

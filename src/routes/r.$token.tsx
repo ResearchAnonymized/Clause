@@ -6,26 +6,16 @@ import { computeReportData, type ReportFinding, type ReportCriterion } from "@/l
 import { verdictI18nKey, type Verdict } from "@/lib/verdict";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, AlertTriangle, XCircle, Circle, ShieldCheck, Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { CoverageBar } from "@/components/coverage-bar";
+import { ProductMark } from "@/components/product-mark";
+import { PublicControls } from "@/components/public-controls";
 
 export const Route = createFileRoute("/r/$token")({
   ssr: false,
   head: () => ({
-    meta: [{ title: "Shared audit report — Clause" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Shared audit report — Counterpart" }, { name: "robots", content: "noindex" }],
   }),
   component: SharedReport,
 });
@@ -63,13 +53,13 @@ function SharedReport() {
   }, [data]);
 
   if (isLoading) {
-    return <div className="p-10 text-center text-muted-foreground">Loading report…</div>;
+    return <div className="min-h-screen bg-paper p-10 text-center text-muted-foreground">Loading report…</div>;
   }
 
   if (error || !data || !data.ok || !report) {
     const reason = data && !data.ok ? data.error : "not_found";
     return (
-      <div className="min-h-screen grid place-items-center p-6">
+      <div className="min-h-screen bg-paper grid place-items-center p-6">
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center space-y-2">
             <Lock className="w-8 h-8 mx-auto text-muted-foreground" />
@@ -89,56 +79,44 @@ function SharedReport() {
       ? "bg-ok/10 text-ok border-ok/30"
       : rec.kind === "negotiate"
         ? "bg-warning/10 text-warning border-warning/30"
-        : "bg-critical/10 text-critical border-critical/30";
-
-  const donut = (["aligned", "partial", "gap", "not_addressed"] as Verdict[])
-    .map((v) => ({
-      name: t(verdictI18nKey[v]) as string,
-      value: report.counts[v],
-      color: V_COLORS[v],
-    }))
-    .filter((d) => d.value > 0);
-
-  const perAgent = report.categories.map((c) => ({
-    name: c.category,
-    aligned: c.counts.aligned,
-    partial: c.counts.partial,
-    gap: c.counts.gap,
-    not_addressed: c.counts.not_addressed,
-  }));
+        : rec.kind === "pending"
+          ? "bg-muted/50 text-muted-foreground border-border"
+          : "bg-critical/10 text-critical border-critical/30";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-paper">
       <header className="border-b bg-card">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              Shared audit report
+        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <ProductMark />
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mt-2">
+              Shared report
             </div>
-            <h1 className="text-xl font-semibold">{(run.title as string) ?? "Analysis"}</h1>
+            <h1 className="font-display text-xl font-semibold">{(run.title as string) ?? "Analysis"}</h1>
           </div>
-          <Badge variant="outline" className="text-xs">
-            Read-only
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="outline" className="text-xs">
+              Read-only
+            </Badge>
+            <PublicControls />
+          </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-        <Card className={`border-2 ${recTone}`}>
+      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+        <Card className={`border ${recTone}`}>
           <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <div className="text-xs uppercase tracking-wider opacity-70">Recommendation</div>
-              <div className="text-2xl font-semibold">{rec.headline}</div>
-              <div className="text-sm mt-0.5 opacity-80">{rec.reason}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">Recommendation</div>
+              <div className="text-xl font-semibold mt-1">{rec.headline}</div>
+              <div className="text-sm mt-1 opacity-80">{rec.reason}</div>
             </div>
-            <div className="text-right">
-              <div className="text-xs uppercase tracking-wider opacity-70">Score</div>
-              <div className="text-3xl font-bold tabular-nums">
-                {report.score}
-                <span className="text-base opacity-60">/100</span>
+            {rec.kind !== "pending" && (
+              <div className="text-right">
+                <div className="text-3xl font-semibold tabular-nums leading-none">{report.score}</div>
+                <div className="text-[10px] uppercase tracking-wider opacity-70 mt-1">of 100</div>
               </div>
-              <Progress value={report.score} className="w-32 h-1.5 mt-1" />
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -168,55 +146,35 @@ function SharedReport() {
           </Card>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Coverage</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donut}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={2}
-                  >
-                    {donut.map((d, i) => (
-                      <Cell key={i} fill={d.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Findings per agent</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={perAgent} layout="vertical" margin={{ left: 8, right: 8 }}>
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="aligned" stackId="a" fill={V_COLORS.aligned} />
-                  <Bar dataKey="partial" stackId="a" fill={V_COLORS.partial} />
-                  <Bar dataKey="gap" stackId="a" fill={V_COLORS.gap} />
-                  <Bar dataKey="not_addressed" stackId="a" fill={V_COLORS.not_addressed} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Coverage</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <CoverageBar counts={report.counts} total={report.total} t={t} />
+            {report.categories.length > 0 && (
+              <div className="divide-y border rounded-lg">
+                {report.categories.map((c) => (
+                  <div key={c.category} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                    <span className="min-w-0 truncate">{c.category}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                      {c.counts.gap > 0
+                        ? `${c.counts.gap} gap${c.counts.gap === 1 ? "" : "s"}`
+                        : c.counts.partial > 0
+                          ? `${c.counts.partial} partial`
+                          : t(verdictI18nKey.aligned)}
+                      <span className="ml-3 font-medium text-foreground">{c.score}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">All requirements ({report.total})</CardTitle>
+            <CardTitle className="text-sm">Requirements ({report.total})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
@@ -225,24 +183,12 @@ function SharedReport() {
                 return (
                   <div
                     key={r.criterion.id}
-                    className="grid grid-cols-[24px_1fr_auto] items-start gap-3 px-4 py-3"
+                    className="grid grid-cols-[24px_1fr_auto] items-center gap-3 px-4 py-3"
                   >
-                    <Icon className="w-4 h-4 mt-0.5" style={{ color: V_COLORS[r.verdict] }} />
+                    <Icon className="w-4 h-4" style={{ color: V_COLORS[r.verdict] }} />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="font-medium text-sm">{r.criterion.name}</div>
-                        <Badge variant="outline" className="text-[10px]">
-                          {r.category}
-                        </Badge>
-                      </div>
-                      {r.finding?.evidence_quote && (
-                        <div className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
-                          “{r.finding.evidence_quote}”
-                        </div>
-                      )}
-                      {r.finding?.justification && (
-                        <div className="text-xs mt-1 line-clamp-2">{r.finding.justification}</div>
-                      )}
+                      <div className="font-medium text-sm">{r.criterion.name}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{r.category}</div>
                     </div>
                     <Badge
                       className="text-[10px] whitespace-nowrap"

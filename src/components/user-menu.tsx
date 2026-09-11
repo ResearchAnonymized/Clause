@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { BookOpen, LogOut, Map, User as UserIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useProductTourOptional } from "@/components/product-tour";
 
 
 export function UserMenu() {
@@ -24,6 +25,7 @@ export function UserMenu() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const tour = useProductTourOptional();
   if (!user) return null;
   const initials = (user.email ?? "?").slice(0, 2).toUpperCase();
   const topRoleKey = roles.includes("admin") ? "roleAdmin" : roles.includes("reviewer") ? "roleReviewer" : "roleViewer";
@@ -56,6 +58,12 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
           <UserIcon className="w-4 h-4 mr-2" /> {t("userMenu.profile")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => tour?.start(0)}>
+          <Map className="w-4 h-4 mr-2" /> {t("productTour.start")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate({ to: "/settings/help" })}>
+          <BookOpen className="w-4 h-4 mr-2" /> {t("sidebar.help")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-destructive">

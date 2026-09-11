@@ -1,18 +1,11 @@
 import { useMemo, useState } from "react";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-  Legend,
-} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { CheckCircle2, AlertTriangle, XCircle, Circle, Search, Share2, Copy, Check, Trash2, Link2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Circle, Search, Share2, Copy, Trash2, Link2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +13,10 @@ import { computeReportData, type ReportFinding, type ReportCriterion } from "@/l
 import { verdictI18nKey, type Verdict } from "@/lib/verdict";
 import { createReportShare, listReportShares, revokeReportShare } from "@/lib/report-shares.functions";
 import { useTranslation } from "react-i18next";
+import { CoverageBar } from "@/components/coverage-bar";
+import { GapBrief } from "@/components/gap-brief";
+import { useClausePairs } from "@/components/pack/clause-pairs-panel";
+import { buildGapBrief, type BriefDocument } from "@/lib/gap-brief";
 
 const V_COLORS: Record<Verdict, string> = {
   aligned: "hsl(142 71% 45%)",
@@ -27,61 +24,57 @@ const V_COLORS: Record<Verdict, string> = {
   gap: "hsl(0 84% 60%)",
   not_addressed: "hsl(220 9% 46%)",
 };
-const V_ICON: Record<Verdict, any> = {
-  aligned: CheckCircle2, partial: AlertTriangle, gap: XCircle, not_addressed: Circle,
+const V_ICON: Record<Verdict, typeof CheckCircle2> = {
+  aligned: CheckCircle2,
+  partial: AlertTriangle,
+  gap: XCircle,
+  not_addressed: Circle,
 };
 
 export function DynamicReport({
   runId,
-  workspaceId,
   findings,
   criteria,
+  documents = [],
+  title,
 }: {
   runId: string;
-  workspaceId: string;
+  workspaceId?: string;
   findings: ReportFinding[];
   criteria: ReportCriterion[];
+  documents?: BriefDocument[];
+  title?: string;
 }) {
   const { t } = useTranslation();
   const data = useMemo(() => computeReportData(findings, criteria), [findings, criteria]);
+  const { data: pairs = [] } = useClausePairs(runId);
+  const brief = useMemo(
+    () => buildGapBrief({ rows: data.rows, pairs, docs: documents }),
+    [data.rows, pairs, documents],
+  );
   const [q, setQ] = useState("");
   const [verdictFilter, setVerdictFilter] = useState<"all" | Verdict>("all");
-  const [catFilter, setCatFilter] = useState<string>("all");
 
   const filtered = useMemo(() => {
     return data.rows.filter((r) => {
       if (verdictFilter !== "all" && r.verdict !== verdictFilter) return false;
-      if (catFilter !== "all" && r.category !== catFilter) return false;
       if (q) {
-        const hay = `${r.criterion.name} ${r.finding?.evidence_quote ?? ""} ${r.finding?.justification ?? ""}`.toLowerCase();
+        const hay = `${r.criterion.name} ${r.category}`.toLowerCase();
         if (!hay.includes(q.toLowerCase())) return false;
       }
       return true;
     });
-  }, [data.rows, q, verdictFilter, catFilter]);
-
-  const donut = (["aligned", "partial", "gap", "not_addressed"] as Verdict[]).map((v) => ({
-    name: t(verdictI18nKey[v]) as string,
-    key: v,
-    value: data.counts[v],
-    color: V_COLORS[v],
-  })).filter((d) => d.value > 0);
-
-  const radar = data.categories.map((c) => ({ agent: c.category.split(" ")[0], score: c.score, fullMark: 100 }));
-
-  const heatmap = data.categories.map((c) => ({
-    name: c.category,
-    aligned: c.counts.aligned,
-    partial: c.counts.partial,
-    gap: c.counts.gap,
-    not_addressed: c.counts.not_addressed,
-  }));
+  }, [data.rows, q, verdictFilter]);
 
   const rec = data.recommendation;
   const recTone =
-    rec.kind === "sign" ? "bg-ok/10 text-ok border-ok/30" :
-    rec.kind === "negotiate" ? "bg-warning/10 text-warning border-warning/30" :
-    "bg-critical/10 text-critical border-critical/30";
+    rec.kind === "sign"
+      ? "bg-ok/10 text-ok border-ok/30"
+      : rec.kind === "negotiate"
+        ? "bg-warning/10 text-warning border-warning/30"
+        : rec.kind === "pending"
+          ? "bg-muted/50 text-muted-foreground border-border"
+          : "bg-critical/10 text-critical border-critical/30";
 
   const qc = useQueryClient();
   const createShareFn = useServerFn(createReportShare);
@@ -132,24 +125,24 @@ export function DynamicReport({
 
   return (
     <div className="space-y-6">
-      {/* Headline strip */}
-      <Card className={`border-2 ${recTone}`}>
+      <Card className={`border ${recTone}`}>
         <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div className="text-xs uppercase tracking-wider opacity-70">Recommendation</div>
-            <div className="text-2xl font-semibold mt-0.5">{rec.headline}</div>
-            <div className="text-sm mt-0.5 opacity-80">{rec.reason}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">Recommendation</div>
+            <div className="text-xl font-semibold mt-1">{rec.headline}</div>
+            <div className="text-sm mt-1 opacity-80">{rec.reason}</div>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <div className="text-xs uppercase tracking-wider opacity-70">Score</div>
-              <div className="text-3xl font-bold tabular-nums">{data.score}<span className="text-base opacity-60">/100</span></div>
-              <Progress value={data.score} className="w-32 h-1.5 mt-1" />
-            </div>
+          <div className="flex items-center gap-5">
+            {rec.kind !== "pending" && (
+              <div className="text-right">
+                <div className="text-3xl font-semibold tabular-nums leading-none">{data.score}</div>
+                <div className="text-[10px] uppercase tracking-wider opacity-70 mt-1">of 100</div>
+              </div>
+            )}
             <Dialog open={shareOpen} onOpenChange={setShareOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <Share2 className="w-4 h-4 mr-1" /> Share report
+                  <Share2 className="w-4 h-4 mr-1" /> Share
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
@@ -216,63 +209,38 @@ export function DynamicReport({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Coverage</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <CoverageBar counts={data.counts} total={data.total} t={t} />
+          {data.categories.length > 0 && (
+            <div className="divide-y border rounded-lg">
+              {data.categories.map((c) => (
+                <div key={c.category} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <span className="min-w-0 truncate">{c.category}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    {c.counts.gap > 0
+                      ? `${c.counts.gap} gap${c.counts.gap === 1 ? "" : "s"}`
+                      : c.counts.partial > 0
+                        ? `${c.counts.partial} partial`
+                        : t(verdictI18nKey.aligned)}
+                    <span className="ml-3 font-medium text-foreground">{c.score}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
+      <GapBrief runId={runId} title={title || ""} brief={brief} />
 
-      {/* Charts row */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Coverage by verdict</CardTitle></CardHeader>
-          <CardContent className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={donut} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={2}>
-                  {donut.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Pie>
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Agent scores</CardTitle></CardHeader>
-          <CardContent className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radar} outerRadius={80}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="agent" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9 }} />
-                <Radar dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.25} />
-                <Tooltip />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Findings per agent</CardTitle></CardHeader>
-          <CardContent className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={heatmap} layout="vertical" margin={{ left: 8, right: 8 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip />
-                <Bar dataKey="aligned" stackId="a" fill={V_COLORS.aligned} />
-                <Bar dataKey="partial" stackId="a" fill={V_COLORS.partial} />
-                <Bar dataKey="gap" stackId="a" fill={V_COLORS.gap} />
-                <Bar dataKey="not_addressed" stackId="a" fill={V_COLORS.not_addressed} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters + table */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <CardTitle className="text-base">All requirements ({filtered.length} of {data.total})</CardTitle>
+            <CardTitle className="text-base">Requirements ({filtered.length})</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -282,17 +250,10 @@ export function DynamicReport({
                 <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All verdicts</SelectItem>
-                  <SelectItem value="aligned">{t(verdictI18nKey["aligned" as Verdict])}</SelectItem>
-                  <SelectItem value="partial">{t(verdictI18nKey["partial" as Verdict])}</SelectItem>
-                  <SelectItem value="gap">{t(verdictI18nKey["gap" as Verdict])}</SelectItem>
-                  <SelectItem value="not_addressed">{t(verdictI18nKey["not_addressed" as Verdict])}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={catFilter} onValueChange={setCatFilter}>
-                <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All agents</SelectItem>
-                  {data.categories.map((c) => <SelectItem key={c.category} value={c.category}>{c.category}</SelectItem>)}
+                  <SelectItem value="aligned">{t(verdictI18nKey.aligned)}</SelectItem>
+                  <SelectItem value="partial">{t(verdictI18nKey.partial)}</SelectItem>
+                  <SelectItem value="gap">{t(verdictI18nKey.gap)}</SelectItem>
+                  <SelectItem value="not_addressed">{t(verdictI18nKey.not_addressed)}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -303,19 +264,11 @@ export function DynamicReport({
             {filtered.map((r) => {
               const Icon = V_ICON[r.verdict];
               return (
-                <div key={r.criterion.id} className="grid grid-cols-[24px_1fr_auto] items-start gap-3 px-4 py-3">
-                  <Icon className="w-4 h-4 mt-0.5" style={{ color: V_COLORS[r.verdict] }} />
+                <div key={r.criterion.id} className="grid grid-cols-[24px_1fr_auto] items-center gap-3 px-4 py-3">
+                  <Icon className="w-4 h-4" style={{ color: V_COLORS[r.verdict] }} />
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="font-medium text-sm truncate">{r.criterion.name}</div>
-                      <Badge variant="outline" className="text-[10px]">{r.category}</Badge>
-                    </div>
-                    {r.finding?.evidence_quote && (
-                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">“{r.finding.evidence_quote}”</div>
-                    )}
-                    {r.finding?.justification && (
-                      <div className="text-xs mt-1 line-clamp-2">{r.finding.justification}</div>
-                    )}
+                    <div className="font-medium text-sm truncate">{r.criterion.name}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{r.category}</div>
                   </div>
                   <Badge className="text-[10px] whitespace-nowrap" style={{ background: V_COLORS[r.verdict] + "22", color: V_COLORS[r.verdict] }}>
                     {t(verdictI18nKey[r.verdict])}

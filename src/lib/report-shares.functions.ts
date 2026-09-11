@@ -76,7 +76,7 @@ export const getSharedReport = createServerFn({ method: "POST" })
     const docsResp = await admin.from("run_documents").select("id,role,filename").eq("run_id", runId);
     const setId = (runResp.data as any)?.criteria_set_id ?? null;
     const criteriaResp = setId
-      ? await admin.from("criteria").select("id,name,category,sort_order").eq("set_id", setId).order("sort_order")
+      ? await admin.from("criteria").select("id,name,category,sort_order,enabled").eq("set_id", setId).order("sort_order")
       : { data: [] as any[] };
     const decisionResp = await (admin.from("decisions" as any) as any).select("*").eq("run_id", runId).neq("status", "revoked").maybeSingle();
 

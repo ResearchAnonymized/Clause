@@ -20,7 +20,7 @@ import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 import { canManageOrganization } from "@/lib/organizations";
 
 export const Route = createFileRoute("/_authenticated/settings/organization")({
-  head: () => ({ meta: [{ title: "Organization — Clause" }] }),
+  head: () => ({ meta: [{ title: "Organization — Counterpart" }] }),
   component: OrganizationSettingsPage,
 });
 
@@ -88,7 +88,7 @@ function OrganizationSettingsPage() {
         },
       });
       setLastInviteUrl(result.acceptUrl);
-      toast.success("Invite created — copy the link below");
+      toast.success("Invite created — the link is below (and in the server log if email is not configured)");
       setInviteEmail("");
       qc.invalidateQueries({ queryKey: ["org-invites", organizationId] });
     } catch (e: any) {

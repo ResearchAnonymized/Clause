@@ -2,10 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import {
-  DEFAULT_LLM_CONFIG,
+  mergeLlmConfig,
   type AgentPromptsConfig,
   type LlmConfig,
 } from "@/lib/agent-defaults";
+import { withCostTier } from "@/lib/ai-gateway.server";
 
 const Input = z.object({
   runId: z.string().uuid(),
@@ -40,12 +41,11 @@ export const remapClauses = createServerFn({ method: "POST" })
       .eq("id", workspaceId)
       .maybeSingle();
 
-    const llmConfig = {
-      ...DEFAULT_LLM_CONFIG,
-      ...(((workspace?.llm_config as unknown) as LlmConfig) ?? {}),
-    };
+    const llmConfig = mergeLlmConfig((workspace?.llm_config as unknown as LlmConfig) ?? null);
     const agentPrompts = ((workspace?.agent_prompts as unknown) as AgentPromptsConfig) ?? null;
-    const workspaceModel = llmConfig.model || process.env.AI_DEFAULT_MODEL || DEFAULT_LLM_CONFIG.model;
+    const workspaceModel = llmConfig.model || process.env.AI_DEFAULT_MODEL || llmConfig.model;
+
+    return withCostTier(llmConfig.extra?.cost_tier, async () => {
 
     const [{ data: custChunks }, { data: suppChunks }] = await Promise.all([
       supabase
@@ -144,4 +144,5 @@ export const remapClauses = createServerFn({ method: "POST" })
       .eq("id", runId);
 
     return { ok: true, pairs: pairs.length, frozen };
+    });
   });

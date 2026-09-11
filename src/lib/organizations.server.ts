@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { getSql } from "@/db/pool";
 import {
   inviteExpiresAt,
+  parseInviteInput,
   uniqueSlug,
   type OrganizationKind,
   type OrganizationRole,
@@ -139,7 +140,7 @@ export async function acceptOrganizationInvite(opts: {
   userEmail: string;
 }): Promise<{ organizationId: string; workspaceId: string | null }> {
   const sql = getSql();
-  const tokenHash = hashInviteToken(opts.token);
+  const tokenHash = hashInviteToken(parseInviteInput(opts.token));
   const invites = await sql`
     SELECT id, organization_id, email, role, expires_at, accepted_at, revoked_at
     FROM organization_invites

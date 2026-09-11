@@ -38,7 +38,7 @@ function formatRunSummary(summary: string): string {
 }
 
 export const Route = createFileRoute("/_authenticated/runs/")({
-  head: () => ({ meta: [{ title: "Analyses — Clause" }] }),
+  head: () => ({ meta: [{ title: "Analyses — Counterpart" }] }),
   component: RunsPage,
 });
 
@@ -113,7 +113,7 @@ function RunsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap" data-tour-stage="analyses">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("runs.title")}</h1>
           <p className="text-muted-foreground mt-1">
@@ -148,7 +148,7 @@ function RunsPage() {
             <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mb-3">
               <Inbox className="w-6 h-6 text-brand" />
             </div>
-            <h2 className="font-semibold text-lg">{t("runs.emptyTitle")}</h2>
+            <h2 className="font-display font-semibold text-lg">{t("runs.emptyTitle")}</h2>
             <p className="text-muted-foreground text-sm max-w-sm mt-1">{t("runs.emptyCopy")}</p>
             <Button asChild className="mt-4">
               <Link to="/runs/new">

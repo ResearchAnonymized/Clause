@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/runs/compare")({
-  head: () => ({ meta: [{ title: "Compare analyses — Clause" }] }),
+  head: () => ({ meta: [{ title: "Compare analyses — Counterpart" }] }),
   component: ComparePage,
 });
 

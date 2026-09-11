@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: counterpart-config
+  namespace: counterpart
+  labels:
+    app.kubernetes.io/name: counterpart
+    app.kubernetes.io/component: app
+data:
+  NODE_ENV: "production"
+  HOST: "0.0.0.0"
+  PORT: "3000"
+  NITRO_HOST: "0.0.0.0"
+  NITRO_PORT: "3000"
+  AUTH_SIGNUP_MODE: "invite-only"
+  STORAGE_DRIVER: "s3"
+  STORAGE_ENDPOINT: "http://minio:9000"
+  STORAGE_REGION: "eu-central-1"
+  STORAGE_BUCKET: "contracts"
+  STORAGE_FORCE_PATH_STYLE: "true"
+  STORAGE_ACCESS_KEY: "clause"
+  # Chat/analysis. Point at in-cluster inference (http://inference:8000/v1) or an external gateway.
+  AI_BASE_URL: "http://inference:8000/v1"
+  AI_DEFAULT_MODEL: "REPLACE_WITH_SERVED_MODEL_ID"
+  AI_EMBEDDING_MODEL: "REPLACE_WITH_EMBEDDING_MODEL_ID"
+  AI_COST_TIER: "medium"
+  # Leave blank to use AI_BASE_URL. Set when embeddings are a different service.
+  AI_EMBEDDING_BASE_URL: ""
+  OPERATOR_LEGAL_NAME: ""
+  PRIVACY_EMAIL: ""
+  SECURITY_EMAIL: ""

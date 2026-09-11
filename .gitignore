@@ -50,6 +50,16 @@ _tmp_*
 *.sln
 *.sw?
 
-# Deploy secrets (keep examples only)
-deploy/*.env
-!deploy/env.production.example
+# Deploy artifacts
+deploy/dist/
+
+# Tests
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# OpenShift/Kubernetes secrets (keep *.example.yaml)
+deploy/openshift/secret.yaml
+deploy/openshift/**/secret.yaml

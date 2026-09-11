@@ -31,11 +31,11 @@ export async function notifyWorkspaceWebhook(
           title: `${emoji} ${payload.title}`,
           text: payload.body,
           potentialAction: payload.link
-            ? [{ "@type": "OpenUri", name: "Open in Clause", targets: [{ os: "default", uri: payload.link }] }]
+            ? [{ "@type": "OpenUri", name: "Open in Counterpart", targets: [{ os: "default", uri: payload.link }] }]
             : undefined,
         }
       : {
-          text: `${emoji} *${payload.title}*\n${payload.body}${payload.link ? `\n<${payload.link}|Open in Clause>` : ""}`,
+          text: `${emoji} *${payload.title}*\n${payload.body}${payload.link ? `\n<${payload.link}|Open in Counterpart>` : ""}`,
         };
 
     await fetch(url, {

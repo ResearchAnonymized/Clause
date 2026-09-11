@@ -1,0 +1,27 @@
+BIDDER TECHNICAL OFFER — CareFlow Oy (sample)
+Response to North Shore Wellbeing Area ICT platform tender (training pack)
+
+1. Solution
+CareFlow Cloud provides a multi-tenant case-management platform hosted on EU-West. We propose the Professional tier.
+
+2. Availability and support
+We commit to 99.5% monthly availability for the production tenant. Priority-1 incidents are acknowledged within 30 minutes. Restore-time objective for Priority-1 is 8 hours. Service credits are 2% of the monthly fee if availability falls below 99.5%, capped at 10% of the monthly fee.
+
+Planned maintenance may occur on weekday evenings with 48 hours' notice.
+
+3. Security
+CareFlow maintains ISO 27001 certification for its development organisation. Production encryption in transit uses TLS 1.2. Encryption at rest is enabled for object storage; database encryption at rest is on the 2027 roadmap.
+
+Privileged access uses shared break-glass accounts for on-call engineers. Access reviews are annual.
+
+4. Sub-processors
+Hosting: EU hyperscaler (Ireland). Observability: third-party APM (United States region for log aggregation). We will inform the customer when the sub-processor list changes.
+
+5. Exit
+On termination we will make an export available for 14 days. Additional exit assistance is available as a paid professional-services engagement.
+
+6. Liability
+All liability, including data-protection claims, is capped at 100% of fees paid in the preceding 12 months. Indirect and consequential damages are excluded.
+
+7. Certificates
+ISO 27001 certificate attached as a separate file in a live tender; omitted from this sample pack.

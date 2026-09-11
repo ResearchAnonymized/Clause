@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/settings/errors")({
-  head: () => ({ meta: [{ title: "Error log — Clause" }] }),
+  head: () => ({ meta: [{ title: "Error log — Counterpart" }] }),
   component: ErrorsPage,
 });
 

@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DpaRouteImport } from './routes/dpa'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetRouteImport } from './routes/reset'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as VerifyRouteImport } from './routes/verify'
@@ -75,6 +76,11 @@ const DpaRoute = DpaRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetRoute = ResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurityRoute = SecurityRouteImport.update({
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dpa': typeof DpaRoute
   '/privacy': typeof PrivacyRoute
+  '/reset': typeof ResetRoute
   '/security': typeof SecurityRoute
   '/terms': typeof TermsRoute
   '/verify': typeof VerifyRoute
@@ -336,6 +343,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dpa': typeof DpaRoute
   '/privacy': typeof PrivacyRoute
+  '/reset': typeof ResetRoute
   '/security': typeof SecurityRoute
   '/terms': typeof TermsRoute
   '/verify': typeof VerifyRoute
@@ -382,6 +390,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/dpa': typeof DpaRoute
   '/privacy': typeof PrivacyRoute
+  '/reset': typeof ResetRoute
   '/security': typeof SecurityRoute
   '/terms': typeof TermsRoute
   '/verify': typeof VerifyRoute
@@ -428,6 +437,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dpa'
     | '/privacy'
+    | '/reset'
     | '/security'
     | '/terms'
     | '/verify'
@@ -472,6 +482,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dpa'
     | '/privacy'
+    | '/reset'
     | '/security'
     | '/terms'
     | '/verify'
@@ -517,6 +528,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dpa'
     | '/privacy'
+    | '/reset'
     | '/security'
     | '/terms'
     | '/verify'
@@ -563,6 +575,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DpaRoute: typeof DpaRoute
   PrivacyRoute: typeof PrivacyRoute
+  ResetRoute: typeof ResetRoute
   SecurityRoute: typeof SecurityRoute
   TermsRoute: typeof TermsRoute
   VerifyRoute: typeof VerifyRoute
@@ -612,6 +625,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset': {
+      id: '/reset'
+      path: '/reset'
+      fullPath: '/reset'
+      preLoaderRoute: typeof ResetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/security': {
@@ -952,6 +972,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DpaRoute: DpaRoute,
   PrivacyRoute: PrivacyRoute,
+  ResetRoute: ResetRoute,
   SecurityRoute: SecurityRoute,
   TermsRoute: TermsRoute,
   VerifyRoute: VerifyRoute,

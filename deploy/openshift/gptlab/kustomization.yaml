@@ -1,0 +1,15 @@
+# Add another GPT-Lab service next to Counterpart without changing the app.
+#
+# 1. Copy this folder to deploy/openshift/gptlab/<service-name>/
+# 2. Add a Deployment + Service (CPU by default; request nvidia.com/gpu only if the process loads a model).
+# 3. Label everything:
+#      app.kubernetes.io/part-of: gptlab
+#      app.kubernetes.io/name: <service-name>
+# 4. Append the folder to deploy/openshift/kustomization.yaml resources.
+# 5. If Counterpart should call it, put its in-cluster URL in counterpart-config
+#    (e.g. AI_BASE_URL=http://<service-name>:8000/v1) — no code change required
+#    as long as the service is OpenAI-compatible.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []

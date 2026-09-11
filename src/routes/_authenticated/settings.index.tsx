@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { resetOnboarding } from "@/components/onboarding-tour";
+import { ProductTourStartButton } from "@/components/product-tour";
 import {
   HelpCircle,
   Cpu,
@@ -26,7 +27,7 @@ import {
 import { PageBack } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/settings/")({
-  head: () => ({ meta: [{ title: "Settings — Clause" }] }),
+  head: () => ({ meta: [{ title: "Settings — Counterpart" }] }),
   component: SettingsPage,
 });
 
@@ -70,7 +71,7 @@ function SettingsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour-stage="settings">
         <PageBack label="Back to analyses" fallback={{ to: "/runs" }} />
         <h1 className="text-2xl font-semibold tracking-tight">{t("settingsPage.profileTitle")}</h1>
         <p className="text-muted-foreground mt-1 text-sm">{t("settingsPage.profileSubtitle")}</p>
@@ -128,9 +129,12 @@ function SettingsPage() {
       <section className="rounded-xl border bg-card p-5">
         <h2 className="text-sm font-semibold">{t("settingsPage.helpTitle")}</h2>
         <p className="text-sm text-muted-foreground mt-1 mb-3">{t("settingsPage.helpBody")}</p>
-        <Button variant="outline" size="sm" onClick={resetOnboarding}>
-          <HelpCircle className="w-4 h-4 mr-2" /> {t("settingsPage.restartTour")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ProductTourStartButton variant="default" size="sm" />
+          <Button variant="outline" size="sm" onClick={() => void resetOnboarding()}>
+            <HelpCircle className="w-4 h-4 mr-2" /> {t("settingsPage.restartTour")}
+          </Button>
+        </div>
       </section>
     </div>
   );

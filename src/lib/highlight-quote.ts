@@ -133,19 +133,40 @@ function flattenHtml(root: HTMLElement): { text: string; map: MapEntry[] } {
   return { text, map };
 }
 
-function wrapRanges(
-  map: MapEntry[],
-  ranges: Array<{ start: number; end: number }>,
-  toneClass = "",
-) {
+export type EvidencePaintSpec = {
+  quote: string;
+  toneClass?: string;
+  active?: boolean;
+  findingId?: string;
+};
+
+type WrapRange = {
+  start: number;
+  end: number;
+  toneClass: string;
+  active: boolean;
+  findingId?: string;
+};
+
+function rangesOverlap(a: WrapRange, b: WrapRange) {
+  return a.start < b.end && b.start < a.end;
+}
+
+function wrapRanges(map: MapEntry[], ranges: WrapRange[]) {
   type Piece = { node: Text; start: number; end: number };
   const sorted = [...ranges].sort((a, b) => b.start - a.start);
-  const markClass = ["evidence-hit", toneClass].filter(Boolean).join(" ");
-  const cellClass = ["evidence-hit-cell", toneClass].filter(Boolean).join(" ");
 
-  for (const { start, end } of sorted) {
+  for (const range of sorted) {
+    const markClass = [
+      "evidence-hit",
+      range.toneClass,
+      range.active ? "evidence-hit-active" : "evidence-hit-context",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const cellClass = ["evidence-hit-cell", range.toneClass].filter(Boolean).join(" ");
     const local: Piece[] = [];
-    for (let i = start; i < end && i < map.length; i++) {
+    for (let i = range.start; i < range.end && i < map.length; i++) {
       const entry = map[i];
       if (entry === "space") continue;
       const prev = local[local.length - 1];
@@ -159,17 +180,18 @@ function wrapRanges(
       const { node, start: s, end: e } = local[i];
       if (!node.parentNode || node.data == null) continue;
       try {
-        if (node.parentElement?.hasAttribute("data-evidence-hit")) continue;
+        if (node.parentElement?.closest("mark.evidence-hit")) continue;
         if (s >= node.data.length) continue;
         const mid = s === 0 ? node : node.splitText(s);
         const len = Math.min(e - s, mid.data.length);
         if (len < mid.data.length) mid.splitText(len);
         const mark = document.createElement("mark");
-        mark.setAttribute("data-evidence-hit", "1");
+        mark.setAttribute("data-evidence-mark", "1");
+        if (range.active) mark.setAttribute("data-evidence-hit", "1");
+        if (range.findingId) mark.setAttribute("data-finding-id", range.findingId);
         mark.className = markClass;
         mid.parentNode?.replaceChild(mark, mid);
         mark.appendChild(mid);
-        // Light up the whole table cell so evidence is obvious in Word tables
         const cell = mark.closest("td, th");
         if (cell) {
           cell.classList.add(...cellClass.split(/\s+/).filter(Boolean));
@@ -182,7 +204,7 @@ function wrapRanges(
 }
 
 function clearHits(root: HTMLElement) {
-  root.querySelectorAll("mark[data-evidence-hit]").forEach((m) => {
+  root.querySelectorAll("mark[data-evidence-hit], mark[data-evidence-mark]").forEach((m) => {
     const parent = m.parentNode;
     if (!parent) return;
     while (m.firstChild) parent.insertBefore(m.firstChild, m);
@@ -200,7 +222,62 @@ function clearHits(root: HTMLElement) {
   });
 }
 
+function quoteRange(text: string, quote: string): WrapRange | null {
+  const found = findQuoteInText(text, quote);
+  if (!found.hit) return null;
+  return {
+    start: found.before.length,
+    end: found.before.length + found.hit.length,
+    toneClass: "",
+    active: false,
+  };
+}
+
+/** Paint every finding quote in the live DOM, with the active finding strongest. */
+export function highlightEvidenceInElement(root: HTMLElement, marks: EvidencePaintSpec[]): number {
+  clearHits(root);
+  const usable = marks.filter((m) => (m.quote ?? "").trim().length >= 8);
+  if (!usable.length) return 0;
+
+  const { text, map } = flattenHtml(root);
+  const placed: WrapRange[] = [];
+
+  const inactive = usable.filter((m) => !m.active);
+  const active = usable.filter((m) => m.active);
+
+  for (const m of [...inactive, ...active]) {
+    const hit = quoteRange(text, m.quote);
+    if (!hit) continue;
+    const next: WrapRange = {
+      ...hit,
+      toneClass: m.toneClass ?? "",
+      active: Boolean(m.active),
+      findingId: m.findingId,
+    };
+    if (next.active) {
+      for (let i = placed.length - 1; i >= 0; i--) {
+        if (rangesOverlap(placed[i], next)) placed.splice(i, 1);
+      }
+    } else if (placed.some((p) => rangesOverlap(p, next))) {
+      continue;
+    }
+    placed.push(next);
+  }
+
+  if (placed.length) wrapRanges(map, placed);
+  return root.querySelectorAll("mark.evidence-hit").length;
+}
+
 export type HtmlHighlightResult = { html: string; hitCount: number };
+
+/** Highlight a quote in a live DOM tree (Word preview, HTML reader). */
+export function highlightQuoteInElement(
+  root: HTMLElement,
+  quote: string,
+  toneClass = "",
+): number {
+  return highlightEvidenceInElement(root, [{ quote, toneClass, active: true }]);
+}
 
 /** Wrap quote matches in HTML. Returns hitCount so UI can tell if highlight worked. */
 export function highlightQuoteInHtml(
@@ -213,45 +290,18 @@ export function highlightQuoteInHtml(
 
   const root = document.createElement("div");
   root.innerHTML = html;
-  clearHits(root);
+  const hitCount = highlightQuoteInElement(root, quote, toneClass);
+  return { html: root.innerHTML, hitCount };
+}
 
-  const { text, map } = flattenHtml(root);
-  const found = findQuoteInText(text, quote);
-  const ranges: Array<{ start: number; end: number }> = [];
-
-  if (found.hit) {
-    ranges.push({ start: found.before.length, end: found.before.length + found.hit.length });
-  } else {
-    // Fallback: highlight distinctive tokens
-    const words = quote
-      .trim()
-      .split(/\s+/)
-      .filter((w) => w.length >= 2 && !/^(the|and|for|with|only|from)$/i.test(w));
-    const { folded: fText, map: fMap } = foldWithMap(text);
-    const used = new Set<number>();
-    for (const w of words) {
-      const fTok = foldWithMap(w).folded.trim();
-      if (fTok.length < 2) continue;
-      let from = 0;
-      let placed = false;
-      while (!placed) {
-        const idx = fText.indexOf(fTok, from);
-        if (idx < 0) break;
-        if (!used.has(idx)) {
-          const a = fMap[idx];
-          const b = fMap[Math.min(idx + fTok.length - 1, fMap.length - 1)] + 1;
-          ranges.push({ start: a, end: b });
-          used.add(idx);
-          placed = true;
-        }
-        from = idx + fTok.length;
-      }
-      if (ranges.length >= 8) break;
-    }
-  }
-
-  if (ranges.length) wrapRanges(map, ranges, toneClass);
-
-  const hitCount = root.querySelectorAll("mark[data-evidence-hit]").length;
+export function highlightEvidenceInHtml(
+  html: string,
+  marks: EvidencePaintSpec[],
+): HtmlHighlightResult {
+  if (!html) return { html, hitCount: 0 };
+  if (!marks.length || typeof document === "undefined") return { html, hitCount: 0 };
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  const hitCount = highlightEvidenceInElement(root, marks);
   return { html: root.innerHTML, hitCount };
 }

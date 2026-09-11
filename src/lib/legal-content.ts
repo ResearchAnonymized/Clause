@@ -1,13 +1,22 @@
-/**
- * App-owner authored legal copy. Kept in one file so the four public legal
- * pages stay consistent and easy to review. This is *editable content by the
- * app owner* — not independent certification.
- */
-export const LEGAL_CONTACT = {
-  org: "2M-IT Oy",
-  role: "Data Protection contact",
-  email: "privacy@2m-it.fi",
-  security: "security@2m-it.fi",
-};
+import { operatorLegalName, privacyEmail, securityEmail } from "@/config/instance";
 
-export const LAST_UPDATED = "24 July 2026";
+/**
+ * Operator identity for public legal pages. Left empty until env is set —
+ * copy then refers to “the operator of this instance”.
+ */
+export function legalContact() {
+  const org = operatorLegalName();
+  const email = privacyEmail();
+  const security = securityEmail();
+  return {
+    org,
+    orgDisplay: org || "the operator of this instance",
+    role: "Data protection contact",
+    email,
+    emailDisplay: email || "the privacy contact configured for this instance",
+    security,
+    securityDisplay: security || "the security contact configured for this instance",
+  };
+}
+
+export const LAST_UPDATED = "1 September 2026";

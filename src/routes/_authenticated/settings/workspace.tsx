@@ -62,7 +62,7 @@ function WorkspaceSettingsPage() {
     // Save first so the notify util can read it back
     await supabase.from("workspaces").update({ slack_webhook_url: webhookUrl.trim() }).eq("id", workspaceId!);
     await notifyWorkspaceWebhook(workspaceId!, {
-      title: "Test notification from Clause",
+      title: "Test notification from Counterpart",
       body: "Your Slack/Teams webhook is wired up correctly.",
       link: window.location.origin,
       severity: "ok",
@@ -185,7 +185,7 @@ function WorkspaceSettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Webhook className="h-4 w-4" /> Chat notifications</CardTitle>
           <CardDescription>
-            Paste a Slack or Microsoft Teams incoming webhook URL. Clause will post a message every time an analysis finishes.
+            Paste a Slack or Microsoft Teams incoming webhook URL. Counterpart will post a message every time an analysis finishes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

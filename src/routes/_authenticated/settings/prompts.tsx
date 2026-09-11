@@ -29,7 +29,7 @@ import {
 
 
 export const Route = createFileRoute("/_authenticated/settings/prompts")({
-  head: () => ({ meta: [{ title: "Agent Prompts — Clause" }] }),
+  head: () => ({ meta: [{ title: "Agent Prompts — Counterpart" }] }),
   component: PromptsPage,
 });
 

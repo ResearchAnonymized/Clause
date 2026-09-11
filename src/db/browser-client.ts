@@ -196,6 +196,7 @@ function createBrowserAuth() {
           full_name?: string;
           organization_name?: string;
           organization_kind?: "personal" | "company";
+          invite_token?: string;
         };
         emailRedirectTo?: string;
       };
@@ -211,6 +212,7 @@ function createBrowserAuth() {
           fullName: options?.data?.full_name,
           organizationName: options?.data?.organization_name,
           organizationKind: options?.data?.organization_kind,
+          inviteToken: options?.data?.invite_token,
         }),
       });
       const json = await res.json();

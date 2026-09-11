@@ -1,17 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useRoles, type AppRole } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { listPlatformUsers, setPlatformRole, setUserDeactivated } from "@/lib/platform-admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Platform users — Clause" }] }),
+  head: () => ({ meta: [{ title: "Platform users — Counterpart" }] }),
   component: AdminPage,
 });
 
@@ -24,27 +25,26 @@ function AdminPage() {
   const { data: rows } = useQuery({
     queryKey: ["admin", "users"],
     enabled: isAdmin,
-    queryFn: async () => {
-      const [{ data: profiles }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, display_name"),
-        supabase.from("user_roles").select("user_id, role"),
-      ]);
-      const roleMap = new Map<string, AppRole[]>();
-      for (const r of roles ?? []) {
-        const arr = roleMap.get(r.user_id) ?? [];
-        arr.push(r.role as AppRole);
-        roleMap.set(r.user_id, arr);
-      }
-      return (profiles ?? []).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
-    },
+    queryFn: async () => listPlatformUsers(),
   });
 
   const setRole = async (userId: string, role: AppRole) => {
-    await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
-    if (error) return toast.error(error.message);
-    toast.success(t("adminPage.roleUpdated"));
-    qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    try {
+      await setPlatformRole({ data: { userId, role } });
+      toast.success(t("adminPage.roleUpdated"));
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not update role");
+    }
+  };
+
+  const toggleActive = async (userId: string, deactivated: boolean) => {
+    try {
+      await setUserDeactivated({ data: { userId, deactivated } });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not update account");
+    }
   };
 
   if (loading) return <div className="p-8 text-muted-foreground">{t("common.loading")}</div>;
@@ -86,20 +86,23 @@ function AdminPage() {
                 <TableHead>{t("adminPage.user")}</TableHead>
                 <TableHead>{t("adminPage.currentRoles")}</TableHead>
                 <TableHead>{t("adminPage.setRole")}</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {(rows ?? []).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.display_name ?? r.id.slice(0, 8)}</TableCell>
+                <TableRow key={r.id} className={r.deactivated ? "opacity-60" : undefined}>
                   <TableCell>
-                    {r.roles.map((role) => (
-                      <Badge key={role} variant="secondary" className="mr-1 capitalize">{roleLabel(role)}</Badge>
-                    ))}
+                    <div className="font-medium">{r.display_name}</div>
+                    <div className="text-xs text-muted-foreground">{r.email}</div>
+                    {r.deactivated && <Badge variant="secondary" className="mt-1">{t("adminPage.deactivated")}</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="capitalize">{roleLabel(r.role)}</Badge>
                   </TableCell>
                   <TableCell>
                     <Select
-                      value={r.roles[0] ?? "viewer"}
+                      value={r.role}
                       onValueChange={(v) => setRole(r.id, v as AppRole)}
                       disabled={r.id === user?.id}
                     >
@@ -111,6 +114,13 @@ function AdminPage() {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell>
+                    {r.id !== user?.id && (
+                      <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id, !r.deactivated)}>
+                        {r.deactivated ? t("adminPage.reactivate") : t("adminPage.deactivate")}
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -120,3 +130,4 @@ function AdminPage() {
     </div>
   );
 }
+

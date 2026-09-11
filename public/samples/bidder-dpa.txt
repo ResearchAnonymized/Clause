@@ -1,0 +1,28 @@
+DATA PROCESSING AGREEMENT — CareFlow Oy (sample draft)
+
+1. Parties
+Customer as controller; CareFlow Oy as processor for the CareFlow Cloud service.
+
+2. Processing
+The processor will host case records and related metadata as needed to provide the service. Duration: term of the main agreement plus 14 days.
+
+3. Instructions
+The processor processes personal data only on documented instructions, except where Union or Member State law requires otherwise.
+
+4. Security
+Technical and organisational measures include access control, logging, and backup. Details are described in the CareFlow security whitepaper (not attached in this sample).
+
+5. Sub-processors
+The customer authorises the processor to appoint sub-processors. The processor will publish an updated list on its website. The customer may subscribe to email notices.
+
+6. International transfers
+Where a sub-processor is outside the EEA, the processor will rely on the sub-processor's standard contractual clauses.
+
+7. Personal-data breaches
+The processor will notify the controller without undue delay after becoming aware of a personal-data breach. Target notification window: 72 hours.
+
+8. Audits
+The processor will provide a summary of its latest ISO 27001 audit. On-site customer audits are not included in the standard service.
+
+9. Return and deletion
+After the 14-day export window, remaining copies are deleted in accordance with the processor's backup cycle (up to 90 days).

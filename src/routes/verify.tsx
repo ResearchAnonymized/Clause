@@ -7,14 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, ShieldAlert, Upload } from "lucide-react";
 import { verifyDecisionHash } from "@/lib/verify-decision.functions";
+import { ProductMark } from "@/components/product-mark";
+import { PublicControls } from "@/components/public-controls";
 
 export const Route = createFileRoute("/verify")({
   head: () => ({
     meta: [
-      { title: "Verify signed decision — Clause" },
-      { name: "description", content: "Verify the authenticity of a Clause signed decision by comparing the document fingerprint." },
-      { property: "og:title", content: "Verify signed decision — Clause" },
-      { property: "og:description", content: "Confirm that a Clause audit report has not been altered since it was signed." },
+      { title: "Verify signed decision — Counterpart" },
+      { name: "description", content: "Verify the authenticity of a Counterpart signed decision by comparing the document fingerprint." },
+      { property: "og:title", content: "Verify signed decision — Counterpart" },
+      { property: "og:description", content: "Confirm that a Counterpart audit report has not been altered since it was signed." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -65,14 +67,18 @@ function VerifyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-paper text-foreground">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <ProductMark />
+        <PublicControls />
+      </header>
       <div className="mx-auto max-w-2xl px-6 py-16">
         <div className="mb-8 flex items-center gap-3">
           <ShieldCheck className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-semibold">Verify signed decision</h1>
+          <h1 className="font-display text-2xl font-semibold">Verify signed decision</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          Paste the SHA-256 fingerprint printed on a Clause audit report, or upload the source contract to
+          Paste the SHA-256 fingerprint printed on a Counterpart audit report, or upload the source contract to
           compute the fingerprint locally. Your file never leaves the browser.
         </p>
 
@@ -116,7 +122,7 @@ function VerifyPage() {
               <div>
                 <div className="font-medium text-critical">No signed decision matches this fingerprint.</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  Either the document was altered after signing, or it was never signed through Clause.
+                  Either the document was altered after signing, or it was never signed through Counterpart.
                 </div>
               </div>
             </CardContent>

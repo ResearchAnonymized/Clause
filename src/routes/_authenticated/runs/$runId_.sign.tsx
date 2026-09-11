@@ -18,7 +18,7 @@ import { sealDecisionSignature } from "@/lib/decisions.functions";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/runs/$runId_/sign")({
-  head: () => ({ meta: [{ title: "Decide & sign — Clause" }] }),
+  head: () => ({ meta: [{ title: "Decide & sign — Counterpart" }] }),
   component: SignWizardPage,
 });
 
@@ -69,14 +69,19 @@ function SignWizardPage() {
       (await supabase.from("criteria").select("*").eq("set_id", (run as any).criteria_set_id).order("sort_order")).data ?? [],
   });
 
-  const report = useMemo(() => computeReportData(findings ?? [], (criteria ?? []) as any), [findings, criteria]);
+  const report = useMemo(() => {
+    if (!criteria) return computeReportData([], []);
+    return computeReportData(findings ?? [], criteria as any);
+  }, [findings, criteria]);
 
   // Auto-suggest verdict from recommendation on first load.
   useEffect(() => {
     if (verdict) return;
     if (!report.total) return;
+    if (report.recommendation.kind === "pending") return;
     const map: Record<string, Verdict> = { sign: "sign", negotiate: "negotiate", reject: "reject" };
-    setVerdict(map[report.recommendation.kind]);
+    const next = map[report.recommendation.kind];
+    if (next) setVerdict(next);
   }, [report.recommendation.kind, report.total, verdict]);
 
   // Auto-seed negotiation items from partial+gap findings when reaching step 2.

@@ -29,10 +29,26 @@ export type ClauseDocumentAst = {
 };
 
 const HEADING_RE =
-  /^(?:#{1,6}\s+|(?:SECTION|ARTICLE|CLAUSE|ANNEX|APPENDIX|SCHEDULE)\s+[\dIVXLC.]+[.:)]?\s*|(?:§|§§)\s*[\d.]+|[\d]+(?:\.[\d]+){0,3}\s+[A-ZÅÄÖ])/;
+  /^(?:#{1,6}\s+|(?:SECTION|ARTICLE|CLAUSE|ANNEX|APPENDIX|SCHEDULE)\s+[\dIVXLC.]+[.:)]?\s*|(?:§|§§)\s*[\d.]+)/i;
+const NUMBERED_HEADING_RE = /^\d+(?:\.\d+)*\.?\s+[A-ZÅÄÖ]/;
 const CLAUSE_REF_RE = /(?:§\s*[\d.]+(?:\s*\([a-z0-9]+\))?|(?:Article|Clause|Section)\s+[\d.]+)/i;
 const LIST_RE = /^\s*(?:[-*•]|[0-9]+[.)]|[a-z][.)])\s+/;
 const TABLE_LINE_RE = /\|.+\||\t.+\t/;
+
+const MONTH_RE =
+  /January|February|March|April|May|June|July|August|September|October|November|December/i;
+
+/** "1. Executive summary" is a heading; "1. The Supplier shall …." is a list item. */
+export function isNumberedSectionHeading(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length >= 120 || !NUMBERED_HEADING_RE.test(trimmed)) return false;
+  if (/[.!?]$/.test(trimmed)) return false;
+  // Allocations like "0.6 FTE" are not section titles.
+  if (/^0+(?:\.\d+)*\.?\s/.test(trimmed)) return false;
+  // "14 August 2026" / deadline timestamps.
+  if (new RegExp(`^\\d{1,2}\\s+(?:${MONTH_RE.source})\\b`, "i").test(trimmed)) return false;
+  return true;
+}
 
 function blockId(ord: number, type: string): string {
   return `b${ord}-${type}`;
@@ -107,7 +123,7 @@ export function buildClauseAstFromText(
       }
       flushTable();
 
-      if (HEADING_RE.test(trimmed) && trimmed.length < 200) {
+      if ((HEADING_RE.test(trimmed) || isNumberedSectionHeading(trimmed)) && trimmed.length < 200) {
         const ref = detectClauseRef(trimmed);
         blocks.push({
           id: blockId(++ord, ref ? "clause" : "heading"),
@@ -119,7 +135,7 @@ export function buildClauseAstFromText(
         continue;
       }
 
-      if (LIST_RE.test(trimmed)) {
+      if (LIST_RE.test(trimmed) && !isNumberedSectionHeading(trimmed)) {
         blocks.push({
           id: blockId(++ord, "list"),
           type: "list_item",

@@ -4,9 +4,60 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Self-hosted Inter + EB Garamond — same faces on every page, no third-party font CDN. */
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-SemiBold.ttf") format("truetype");
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-Medium.ttf") format("truetype");
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-Italic.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "EB Garamond", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -34,6 +85,9 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-stage: var(--stage);
+  --color-stage-foreground: var(--stage-foreground);
+  --color-paper: var(--paper);
   --color-critical: var(--critical);
   --color-warning: var(--warning);
   --color-ok: var(--ok);
@@ -48,9 +102,10 @@
 }
 
 /*
- * 2M-IT brand palette: deep navy #0A2472 anchoring a calm enterprise light theme.
+ * Counterpart brand palette: deep navy #0A2472 anchoring a calm enterprise light theme.
  */
 :root {
+  color-scheme: light;
   --radius: 0.5rem;
 
   --background: oklch(0.99 0.004 250);
@@ -64,6 +119,9 @@
   --brand: oklch(0.28 0.14 267);              /* ~#0A2472 */
   --brand-foreground: oklch(0.99 0.004 250);
   --brand-soft: oklch(0.94 0.03 260);
+  --stage: #0A2472;
+  --stage-foreground: #ffffff;
+  --paper: #f7f5f0;
 
   --primary: oklch(0.28 0.14 267);
   --primary-foreground: oklch(0.99 0.004 250);
@@ -105,15 +163,19 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.16 0.04 264);
   --foreground: oklch(0.97 0.004 250);
   --card: oklch(0.22 0.06 265);
   --card-foreground: oklch(0.97 0.004 250);
   --popover: oklch(0.22 0.06 265);
   --popover-foreground: oklch(0.97 0.004 250);
-  --brand: oklch(0.62 0.15 265);
+  --brand: oklch(0.72 0.1 264);
   --brand-foreground: oklch(0.16 0.04 264);
   --brand-soft: oklch(0.3 0.1 267);
+  --stage: #0A2472;
+  --stage-foreground: #ffffff;
+  --paper: oklch(0.16 0.04 264);
   --primary: oklch(0.62 0.15 265);
   --primary-foreground: oklch(0.16 0.04 264);
   --secondary: oklch(0.28 0.06 265);
@@ -151,6 +213,26 @@
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
     -webkit-font-smoothing: antialiased;
   }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  /* Compact toolbar / card section titles stay Inter. */
+  h1.font-sans,
+  h2.font-sans {
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+}
+
+/* Marketing landing — navy stage + contract paper */
+.landing-hero-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, black 40%, transparent 75%);
 }
 
 /* Soft workspace surface behind authenticated pages */
@@ -191,24 +273,55 @@ mark.evidence-hit.evidence-tone-not_addressed {
 }
 
 .evidence-tone-gap.evidence-hit,
-mark.evidence-hit.evidence-tone-gap {
+mark.evidence-hit.evidence-tone-gap,
+.docx-preview-host mark.evidence-hit.evidence-tone-gap,
+.docx-reconstructed-page mark.evidence-hit.evidence-tone-gap {
   background-color: color-mix(in oklch, var(--critical) 42%, transparent) !important;
   outline: 1px solid color-mix(in oklch, var(--critical) 85%, transparent);
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--critical) 28%, transparent);
 }
 
 .evidence-tone-partial.evidence-hit,
-mark.evidence-hit.evidence-tone-partial {
-  background-color: color-mix(in oklch, var(--warning) 48%, transparent) !important;
-  outline: 1px solid color-mix(in oklch, var(--warning) 90%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--warning) 32%, transparent);
+mark.evidence-hit.evidence-tone-partial,
+.docx-preview-host mark.evidence-hit.evidence-tone-partial,
+.docx-reconstructed-page mark.evidence-hit.evidence-tone-partial {
+  background-color: color-mix(in oklch, var(--warning) 64%, transparent) !important;
+  outline: 2px solid color-mix(in oklch, var(--warning) 95%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--warning) 40%, transparent);
 }
 
 .evidence-tone-aligned.evidence-hit,
-mark.evidence-hit.evidence-tone-aligned {
-  background-color: color-mix(in oklch, var(--ok) 42%, transparent) !important;
-  outline: 1px solid color-mix(in oklch, var(--ok) 85%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ok) 28%, transparent);
+mark.evidence-hit.evidence-tone-aligned,
+.docx-preview-host mark.evidence-hit.evidence-tone-aligned,
+.docx-reconstructed-page mark.evidence-hit.evidence-tone-aligned {
+  background-color: color-mix(in oklch, var(--ok) 46%, transparent) !important;
+  outline: 1px solid color-mix(in oklch, var(--ok) 88%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ok) 32%, transparent);
+}
+
+mark.evidence-hit {
+  cursor: pointer;
+}
+mark.evidence-hit-active {
+  animation: evidence-pulse 1.2s ease-out 1;
+}
+
+mark.evidence-hit-active.evidence-tone-partial {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--warning) 55%, transparent),
+    0 0 0 6px color-mix(in oklch, var(--warning) 22%, transparent) !important;
+}
+
+mark.evidence-hit-active.evidence-tone-gap {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--critical) 50%, transparent),
+    0 0 0 6px color-mix(in oklch, var(--critical) 20%, transparent) !important;
+}
+
+mark.evidence-hit-active.evidence-tone-aligned {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--ok) 50%, transparent),
+    0 0 0 6px color-mix(in oklch, var(--ok) 20%, transparent) !important;
 }
 
 /* PDF page overlay highlight (pdf.js canvas viewer) */
@@ -257,8 +370,8 @@ mark.evidence-hit.evidence-tone-aligned {
 
 .evidence-doc td.evidence-hit-cell.evidence-tone-partial,
 .evidence-doc th.evidence-hit-cell.evidence-tone-partial {
-  background-color: color-mix(in oklch, var(--warning) 20%, transparent) !important;
-  outline: 1px solid color-mix(in oklch, var(--warning) 50%, transparent);
+  background-color: color-mix(in oklch, var(--warning) 32%, transparent) !important;
+  outline: 2px solid color-mix(in oklch, var(--warning) 70%, transparent);
 }
 
 .evidence-doc td.evidence-hit-cell.evidence-tone-aligned,
@@ -275,30 +388,151 @@ mark.evidence-hit.evidence-tone-aligned {
 
 /* Compact evidence / pack document typography */
 .evidence-doc {
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 14.5px;
+  line-height: 1.7;
+  font-family: var(--font-display);
 }
 .evidence-doc :where(p, li, td, th) {
-  font-size: 12px;
-  line-height: 1.45;
-  margin-top: 0.35em;
-  margin-bottom: 0.35em;
+  font-size: 14.5px;
+  line-height: 1.7;
+  margin-top: 0.55em;
+  margin-bottom: 0.55em;
 }
 .evidence-doc :where(h1) {
-  font-size: 14px;
-  line-height: 1.35;
-  margin-top: 0.75em;
-  margin-bottom: 0.4em;
+  font-size: 1.35em;
+  line-height: 1.3;
+  font-weight: 650;
+  margin-top: 1.1em;
+  margin-bottom: 0.5em;
+  font-family: var(--font-sans);
 }
 .evidence-doc :where(h2, h3, h4) {
-  font-size: 12.5px;
+  font-size: 1.05em;
   line-height: 1.35;
-  margin-top: 0.65em;
-  margin-bottom: 0.3em;
+  font-weight: 650;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  font-family: var(--font-sans);
 }
 .evidence-doc :where(table) {
-  font-size: 11.5px;
+  font-size: 13px;
+  font-family: var(--font-sans);
 }
-.evidence-doc :where(td, th) {
-  padding: 0.25em 0.4em;
+.docx-preview-host {
+  background: var(--paper);
+}
+.dark .docx-preview-host {
+  background: var(--muted);
+}
+.docx-preview-host .docx-wrapper {
+  background: transparent !important;
+  padding: 1.25rem 0 2rem;
+}
+.docx-preview-host .docx-wrapper > section.docx,
+.docx-preview-host section.docx {
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.08),
+    0 14px 36px -16px rgb(15 23 42 / 0.35);
+  margin-left: auto !important;
+  margin-right: auto !important;
+  background: #fff;
+}
+.docx-reconstructed-page {
+  width: min(794px, calc(100% - 2rem));
+  min-height: max(1000px, calc(100% - 2.5rem));
+  margin: 1.25rem auto 2rem;
+  background: #fff;
+  padding: 64px 72px 80px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.08),
+    0 14px 36px -16px rgb(15 23 42 / 0.35);
+}
+.dark .docx-reconstructed-page {
+  background: var(--background);
+}
+.evidence-facts {
+  display: grid;
+  margin: 0 0 1.75rem;
+  border: 1px solid rgb(15 23 42 / 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+.evidence-facts-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 34%) 1fr;
+  border-bottom: 1px solid rgb(15 23 42 / 0.08);
+}
+.evidence-facts-row:last-child {
+  border-bottom: 0;
+}
+.evidence-facts dt {
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(71 85 105);
+  background: #f4f1ea;
+}
+.evidence-facts dd {
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgb(15 23 42 / 0.88);
+}
+.dark .evidence-facts {
+  border-color: rgb(255 255 255 / 0.1);
+}
+.dark .evidence-facts-row {
+  border-bottom-color: rgb(255 255 255 / 0.08);
+}
+.dark .evidence-facts dt {
+  background: rgb(255 255 255 / 0.04);
+  color: var(--muted-foreground);
+}
+.dark .evidence-facts dd {
+  color: var(--foreground);
+}
+
+@keyframes tour-spotlight {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgb(255 255 255 / 0.92),
+      0 0 0 8px color-mix(in oklch, var(--color-brand) 38%, transparent),
+      0 18px 40px -8px color-mix(in oklch, var(--color-brand) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgb(255 255 255 / 1),
+      0 0 0 12px color-mix(in oklch, var(--color-brand) 28%, transparent),
+      0 22px 48px -6px color-mix(in oklch, var(--color-brand) 55%, transparent);
+  }
+}
+.tour-spotlight-ring {
+  animation: tour-spotlight 2s ease-in-out infinite;
+}
+
+@media print {
+  body.printing-gap-brief * {
+    visibility: hidden !important;
+  }
+  body.printing-gap-brief .gap-brief-print,
+  body.printing-gap-brief .gap-brief-print * {
+    visibility: visible !important;
+  }
+  body.printing-gap-brief .gap-brief-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  body.printing-gap-brief .gap-brief-no-print {
+    display: none !important;
+  }
 }

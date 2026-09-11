@@ -1,0 +1,109 @@
+# Counterpart on Hetzner CX22 (~€4–5/mo, 4 GB RAM).
+# No MinIO — uploads go to a disk volume. Skip this file on CX32+ (use docker-compose.prod.yml).
+#
+#   docker compose -f docker-compose.cx22.yml up -d --build
+
+name: counterpart
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clause
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: clause
+    volumes:
+      - counterpart_pg_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clause -d clause"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 400m
+
+  migrate:
+    image: pgvector/pgvector:pg16
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./db:/db:ro
+    restart: on-failure
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        echo "Applying additive migrations…"
+        for f in /db/migrate-*.sql; do
+          echo "  $$f"
+          psql -h db -U clause -d clause -v ON_ERROR_STOP=0 -f "$$f"
+        done
+        echo "Migrations done."
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: 3000
+      DATABASE_URL: postgres://clause:${POSTGRES_PASSWORD}@db:5432/clause
+      STORAGE_DRIVER: fs
+      STORAGE_LOCAL_PATH: /data/storage
+    volumes:
+      - counterpart_fs_data:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+    mem_limit: 900m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_HOST: ${APP_HOST:?set APP_HOST in .env (hostname only, no https://)}
+    volumes:
+      - ./deploy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - counterpart_caddy_data:/data
+      - counterpart_caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 64m
+
+volumes:
+  counterpart_pg_data:
+  counterpart_fs_data:
+  counterpart_caddy_data:
+  counterpart_caddy_config:

@@ -8,6 +8,9 @@ import { useCurrentWorkspace } from "@/hooks/use-workspace";
 import { enqueueRun } from "@/lib/enqueue-run.functions";
 import { expandUploads, type ExpandedUpload } from "@/lib/expand-uploads";
 import { PackPreview } from "@/components/pack/pack-preview";
+import { NewRunCoach, type NewRunCoachPhase } from "@/components/new-run-coach";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +22,7 @@ import { toast } from "sonner";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/runs/new")({
-  head: () => ({ meta: [{ title: "New analysis — Clause" }] }),
+  head: () => ({ meta: [{ title: "New analysis — Counterpart" }] }),
   component: NewRunPage,
 });
 
@@ -41,6 +44,7 @@ function NewRunPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaceId } = useCurrentWorkspace();
+  const { mark: markOnboarding, showCoach } = useOnboarding();
   const [mode, setMode] = useState<Mode>("tender");
   const [title, setTitle] = useState("");
   const [customerFile, setCustomerFile] = useState<File | null>(null);
@@ -50,6 +54,26 @@ function NewRunPage() {
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [criteriaSetId, setCriteriaSetId] = useState<string>("");
   const [busy, setBusy] = useState(false);
+
+  const coachPhase: NewRunCoachPhase = !showCoach
+    ? null
+    : mode === "tender"
+      ? tenderFiles.length === 0
+        ? "tender"
+        : bidderFiles.length === 0
+          ? "bidder"
+          : "start"
+      : mode === "single"
+        ? !customerFile
+          ? "tender"
+          : !supplierFile
+            ? "bidder"
+            : "start"
+        : !customerFile
+          ? "tender"
+          : bulkFiles.length === 0
+            ? "bidder"
+            : "start";
 
   const { data: sets } = useQuery({
     queryKey: ["criteria_sets"],
@@ -160,11 +184,12 @@ function NewRunPage() {
       toast.error(`Could not start analysis: ${String((err as Error)?.message ?? err)}`);
       throw err;
     }
+    void markOnboarding("first_analysis");
     return run.id;
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!criteriaSetId) return toast.error("Pick a criteria set");
     if (!user || !workspaceId) return toast.error("No active workspace — reload and try again");
 
@@ -250,7 +275,7 @@ function NewRunPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour-stage="newAnalysis">
         <PageBack label="Back to analyses" fallback={{ to: "/runs" }} />
         <PageBreadcrumbs items={[{ label: "Analyses", to: "/runs" }, { label: "New analysis" }]} />
         <h1 className="text-2xl font-semibold tracking-tight">New analysis</h1>
@@ -259,7 +284,17 @@ function NewRunPage() {
         </p>
       </div>
 
-      <form onSubmit={submit}>
+      <NewRunCoach
+        phase={coachPhase}
+        onLoadSamples={({ tender, bidder }) => {
+          setMode("tender");
+          setTenderFiles(tender);
+          setBidderFiles(bidder);
+          if (!title) setTitle("Sample · public procurement training pack");
+        }}
+      />
+
+      <form onSubmit={submit} noValidate>
         <Card>
           <CardHeader>
             <CardTitle>Documents</CardTitle>
@@ -295,12 +330,14 @@ function NewRunPage() {
                     hint="Tender PDF or ZIP of annexes"
                     files={tenderFiles}
                     onFiles={setTenderFiles}
+                    highlighted={coachPhase === "tender"}
                   />
                   <MultiDrop
                     label="Bidder response pack"
                     hint="ZIP or multiple PDF/DOCX files"
                     files={bidderFiles}
                     onFiles={setBidderFiles}
+                    highlighted={coachPhase === "bidder"}
                   />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -389,7 +426,12 @@ function NewRunPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={busy}>
+          <Button
+            type="button"
+            disabled={busy || !criteriaSetId || !workspaceId}
+            className={cn(coachPhase === "start" && "ring-2 ring-brand ring-offset-2")}
+            onClick={() => void submit()}
+          >
             <Play className="w-4 h-4 mr-1" />
             {busy
               ? mode === "bulk"
@@ -480,11 +522,13 @@ function MultiDrop({
   hint,
   files,
   onFiles,
+  highlighted,
 }: {
   label: string;
   hint?: string;
   files: File[];
   onFiles: (f: File[]) => void;
+  highlighted?: boolean;
 }) {
   const onDrop = useCallback(
     (accepted: File[]) => {
@@ -519,9 +563,11 @@ function MultiDrop({
         role="button"
         tabIndex={0}
         aria-label={`Drop or click to add ${label}`}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-brand ${
-          isDragActive ? "border-brand bg-brand/5" : "border-border hover:border-brand/50 bg-muted/20"
-        }`}
+        className={cn(
+          "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-brand",
+          isDragActive ? "border-brand bg-brand/5" : "border-border hover:border-brand/50 bg-muted/20",
+          highlighted && "ring-2 ring-brand ring-offset-2 border-brand bg-brand/5",
+        )}
       >
         <input {...getInputProps()} />
         <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />

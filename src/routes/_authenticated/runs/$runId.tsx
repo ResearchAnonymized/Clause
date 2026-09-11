@@ -5,12 +5,11 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { toVerdict, verdictTone, type Verdict } from "@/lib/verdict";
-import { ChevronLeft, ChevronRight, FileText, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, ExternalLink, RefreshCw, Clock, Lock, Columns2, FileStack, ListChecks, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, Columns2, FileStack, ListChecks, Link2, LocateFixed } from "lucide-react";
 import { toast } from "sonner";
 import {
   ANALYZER_VERSION,
@@ -23,16 +22,18 @@ import { reanalyseRun } from "@/lib/reanalyse-run.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PackWorkspace } from "@/components/pack/pack-workspace";
-import { DocumentViewer } from "@/components/pack/document-viewer";
+import { DocumentViewer, fileKindLabel, scrollToEvidenceQuote, type EvidenceLayout } from "@/components/pack/document-viewer";
 import { ClausePairsTeaser } from "@/components/pack/clause-pairs-panel";
 import { findQuoteInText } from "@/lib/highlight-quote";
+import { locateInDocument } from "@/lib/evidence-locator";
 import { cn } from "@/lib/utils";
-import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { PageBack } from "@/components/page-back";
+import { computeReportData } from "@/lib/report-data";
 
 type RunViewMode = "findings" | "documents" | "compare";
 
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
-  head: () => ({ meta: [{ title: "Review — Clause" }] }),
+  head: () => ({ meta: [{ title: "Review — Counterpart" }] }),
   validateSearch: (search: Record<string, unknown>) => ({
     view: (search.view === "documents" || search.view === "compare" || search.view === "findings"
       ? search.view
@@ -46,7 +47,7 @@ export const Route = createFileRoute("/_authenticated/runs/$runId")({
   component: ReviewRoomPage,
 });
 
-type Criterion = { id: string; name: string; description: string | null; prompt: string | null; category: string | null; sort_order: number | null };
+type Criterion = { id: string; name: string; description: string | null; prompt: string | null; category: string | null; sort_order: number | null; enabled?: boolean | null };
 type Finding = {
   id: string; run_id: string; criterion_id: string | null; criterion_name: string | null;
   severity: string | null; evidence_quote: string | null; evidence_chunk_ids: string[] | null;
@@ -110,23 +111,6 @@ function shortenCategory(cat: string | null | undefined): string {
   return SHORT_CATEGORY_LABELS[key] ?? cat;
 }
 
-const STOPWORDS = new Set([
-  "the","and","for","with","from","that","this","have","has","been","must","shall","will",
-  "any","all","are","was","were","not","but","its","their","them","which","when","what",
-  "into","upon","per","onto","over","under","between","within","provide","provided","provides",
-  "regarding","about","also","such","other","each","one","two","level","section","clause",
-  "customer","supplier","offer","tender","contract","agreement","service","services",
-]);
-function deriveFallbackNeedle(name: string | null | undefined, _just: string | null): string {
-  const src = String(name ?? "").toLowerCase().replace(/[^a-zåäö0-9\s-]/g, " ");
-  const words = src.split(/\s+/).filter((w) => w.length >= 4 && !STOPWORDS.has(w));
-  if (words.length === 0) return "";
-  // Longest meaningful word tends to be the most distinctive keyword.
-  words.sort((a, b) => b.length - a.length);
-  return words[0];
-}
-
-
 function ReviewRoomPage() {
   const { t } = useTranslation();
   const { runId } = Route.useParams();
@@ -169,11 +153,13 @@ function ReviewRoomPage() {
     return () => { supabase.removeChannel(ch); };
   }, [runId, qc]);
 
-  // Ordered rows: one per criterion. If no finding yet, treat as pending.
+  // Ordered rows: one per enabled criterion. If no finding yet, treat as pending.
   const rows = useMemo(() => {
     if (!criteria) return [];
     const byCrit = new Map((findings ?? []).map((f) => [f.criterion_id, f] as const));
-    return criteria.map((c) => ({ criterion: c, finding: byCrit.get(c.id) ?? null }));
+    return criteria
+      .filter((c) => c.enabled !== false)
+      .map((c) => ({ criterion: c, finding: byCrit.get(c.id) ?? null }));
   }, [criteria, findings]);
 
   const [activeCat, setActiveCat] = useState<string>("__all__");
@@ -229,6 +215,9 @@ function ReviewRoomPage() {
   const supplierDocs = (docs ?? []).filter((d) => d.role === "supplier");
   const customerDocs = (docs ?? []).filter((d) => d.role === "customer");
   const [packDocId, setPackDocId] = useState<string | null>(null);
+  const [paneSide, setPaneSide] = useState<"customer" | "supplier">("supplier");
+  const [evidenceLayout, setEvidenceLayout] = useState<EvidenceLayout>("empty");
+  const evidencePaneRef = useRef<HTMLDivElement>(null);
   // Analysis / findings is always the home view. Documents & Compare are secondary tools.
   const [viewMode, setViewMode] = useState<RunViewMode>(search.view ?? "findings");
   const [evidenceQuote, setEvidenceQuote] = useState<string>(search.quote ?? "");
@@ -292,9 +281,13 @@ function ReviewRoomPage() {
   const supplierPackLabel =
     supplierDocs.length <= 1
       ? (supplierDocs[0]?.filename ?? null)
-      : `${supplierDocs.length} bidder files`;
+      : t("runDetail.filesCount", { count: supplierDocs.length });
   const tenderPackHint =
-    customerDocs.length > 1 ? `${customerDocs.length} tender files` : null;
+    customerDocs.length === 0
+      ? null
+      : customerDocs.length === 1
+        ? (customerDocs[0]?.filename ?? null)
+        : t("runDetail.filesCount", { count: customerDocs.length });
 
   const anySupplierText = useMemo(
     () =>
@@ -328,15 +321,21 @@ function ReviewRoomPage() {
 
   const isLive = run?.status === "running" || run?.status === "queued";
 
-  // Buyer-facing summary counts (all rows, regardless of filter)
-  const counts = useMemo(() => {
-    const c = { aligned: 0, partial: 0, gap: 0, not_addressed: 0 } as Record<Verdict, number>;
-    for (const r of rows) c[toVerdict(r.finding?.severity)]++;
-    return c;
-  }, [rows]);
+  // Buyer-facing summary — same formula as the full report and PDF.
+  const report = useMemo(() => {
+    if (!criteria) {
+      return computeReportData([], []);
+    }
+    return computeReportData((findings ?? []) as any, criteria as any);
+  }, [findings, criteria]);
+  const counts = report.counts;
 
-  // Overall recommendation.
-  const recommendation = useMemo(() => computeRecommendation(rows), [rows]);
+  const recommendation = useMemo((): Recommendation => {
+    const rec = report.recommendation;
+    const kind: Recommendation["kind"] =
+      rec.kind === "reject" ? "do_not_sign" : rec.kind === "sign" ? "safe" : rec.kind;
+    return { kind, headline: rec.headline, reason: rec.reason, score: report.score };
+  }, [report]);
 
   // Top blockers — highest severity, capped at 3.
   const blockers = useMemo(() => {
@@ -451,6 +450,20 @@ function ReviewRoomPage() {
       });
       if (hit) return hit;
     }
+    if (active?.finding) {
+      const located = pool.find((d) => {
+        const text = firstUsableDocumentText(d.parsed_text, d.extracted_text);
+        return Boolean(
+          locateInDocument(text, {
+            evidenceQuote: active.finding?.evidence_quote,
+            justification: active.finding?.justification,
+            criterionName: active.criterion.name,
+            category: active.criterion.category,
+          }),
+        );
+      });
+      if (located) return located;
+    }
     return pool[0];
   }, [
     supplierDocs,
@@ -461,21 +474,124 @@ function ReviewRoomPage() {
     evidenceSide,
   ]);
 
-  // Keep legacy name used by evidence pane in findings view
-  const supplierDoc = useMemo(() => {
-    if (evidenceSide === "customer") {
-      return supplierDocs[0] ?? null;
+  const evidencePool = paneSide === "customer" ? customerDocs : supplierDocs;
+
+  const evidenceDoc = useMemo(() => {
+    if (packDocId) {
+      const pinned = evidencePool.find((d) => d.id === packDocId);
+      if (pinned) return pinned;
     }
-    return focusEvidenceDoc?.role === "supplier" ? focusEvidenceDoc : supplierDocs[0] ?? null;
-  }, [focusEvidenceDoc, supplierDocs, evidenceSide]);
+    const quote = (active?.finding?.evidence_quote || "").trim();
+    if (quote.length >= 8) {
+      const hit = evidencePool.find((d) => {
+        const text = firstUsableDocumentText(d.parsed_text, d.extracted_text);
+        return !!findQuoteInText(text, quote).hit;
+      });
+      if (hit) return hit;
+    }
+    if (active?.finding) {
+      const located = evidencePool.find((d) => {
+        const text = firstUsableDocumentText(d.parsed_text, d.extracted_text);
+        return Boolean(
+          locateInDocument(text, {
+            evidenceQuote: active.finding?.evidence_quote,
+            justification: active.finding?.justification,
+            criterionName: active.criterion.name,
+            category: active.criterion.category,
+          }),
+        );
+      });
+      if (located) return located;
+    }
+    return evidencePool[0] ?? null;
+  }, [evidencePool, packDocId, active?.finding?.evidence_quote, active?.finding?.justification, active?.criterion.name, active?.criterion.category]);
+
+  useEffect(() => {
+    if (!active?.finding) {
+      setPaneSide(supplierDocs.length ? "supplier" : "customer");
+      return;
+    }
+    const input = {
+      evidenceQuote: active.finding.evidence_quote,
+      justification: active.finding.justification,
+      criterionName: active.criterion.name,
+      category: active.criterion.category,
+    };
+    const inSupplier = supplierDocs.some((d) =>
+      Boolean(locateInDocument(firstUsableDocumentText(d.parsed_text, d.extracted_text), input)),
+    );
+    const inCustomer = customerDocs.some((d) =>
+      Boolean(locateInDocument(firstUsableDocumentText(d.parsed_text, d.extracted_text), input)),
+    );
+    if (inCustomer && !inSupplier) setPaneSide("customer");
+    else setPaneSide(supplierDocs.length ? "supplier" : "customer");
+    // Only re-aim when the selected finding changes; user can still toggle Tender/Bidder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.finding?.id]);
+
+  const onEvidenceLayout = useCallback((layout: EvidenceLayout) => {
+    setEvidenceLayout(layout);
+  }, []);
+
+  const selectPaneSide = (next: "customer" | "supplier") => {
+    if (next === paneSide) return;
+    const current = evidenceDoc;
+    const to = next === "customer" ? customerDocs : supplierDocs;
+    setPaneSide(next);
+    if (current?.doc_kind) {
+      const match = to.find((d) => d.doc_kind === current.doc_kind);
+      setPackDocId(match?.id ?? to[0]?.id ?? null);
+    } else {
+      setPackDocId(to[0]?.id ?? null);
+    }
+  };
+
+  const evidenceQuoteText = (active?.finding?.evidence_quote || "").trim();
+  const locatedPassage = useMemo(() => {
+    if (!active?.finding || !evidenceDoc) return null;
+    return locateInDocument(firstUsableDocumentText(evidenceDoc.parsed_text, evidenceDoc.extracted_text), {
+      evidenceQuote: active.finding.evidence_quote,
+      justification: active.finding.justification,
+      criterionName: active.criterion.name,
+      category: active.criterion.category,
+    });
+  }, [active?.finding, active?.criterion.name, active?.criterion.category, evidenceDoc]);
+  const locatorDisplay = evidenceQuoteText || locatedPassage || "";
+  const locatorIsRelated = !evidenceQuoteText && Boolean(locatedPassage);
+
+  const evidenceMarks = useMemo(
+    () =>
+      rows
+        .filter((r) => r.finding)
+        .map((r) => {
+          const f = r.finding!;
+          const stored = (f.evidence_quote ?? "").trim();
+          const text = firstUsableDocumentText(evidenceDoc?.parsed_text, evidenceDoc?.extracted_text);
+          const located = text
+            ? locateInDocument(text, {
+                evidenceQuote: stored,
+                justification: f.justification,
+                criterionName: r.criterion.name,
+                category: r.criterion.category,
+              })
+            : null;
+          const quote = stored.length >= 8 ? stored : located ?? "";
+          if (quote.length < 8) return null;
+          return { id: f.id, quote, severity: f.severity };
+        })
+        .filter((m): m is { id: string; quote: string; severity: string | null } => Boolean(m)),
+    [rows, evidenceDoc],
+  );
 
   if (!run) return <div className="p-8 text-muted-foreground">{t("common.loading")}</div>;
 
+  const isStale = runStaleness.level !== "fresh";
+  const isCriticallyStale = runStaleness.level === "critical";
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      {/* Compact header */}
-      <div className="border-b bg-background/80 backdrop-blur px-4 lg:px-6 py-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="border-b bg-background px-4 lg:px-6 py-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <PageBack
               label={t("runDetail.allAnalyses")}
@@ -484,30 +600,24 @@ function ReviewRoomPage() {
             />
             <div className="hidden sm:block h-5 w-px bg-border" />
             <div className="min-w-0">
-              <PageBreadcrumbs
-                items={[
-                  { label: "Analyses", to: "/runs" },
-                  { label: run.title || "Analysis" },
-                ]}
-                className="mb-0.5"
-              />
-              <div className="font-medium truncate text-sm">{run.title}</div>
-              <div className="text-xs text-muted-foreground">
-                {rows.length} {rows.length === 1 ? t("review.requirement") : t("review.requirement") + "s"}
+              <h1 className="font-sans font-semibold truncate text-[15px] tracking-tight">{run.title}</h1>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {t("review.requirementCount", { count: rows.length })}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <CountChip verdict="gap" n={counts.gap} />
-            <CountChip verdict="partial" n={counts.partial} />
-            <CountChip verdict="aligned" n={counts.aligned} />
-            <div className="hidden sm:block h-5 w-px bg-border mx-1" />
-            <div className="flex rounded-lg border p-0.5 bg-muted/30">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="hidden md:flex items-center gap-1.5">
+              <CountChip verdict="gap" n={counts.gap} />
+              <CountChip verdict="partial" n={counts.partial} />
+              <CountChip verdict="aligned" n={counts.aligned} />
+            </div>
+            <div className="flex rounded-lg border border-border/70 p-0.5 bg-muted/40">
               {(
                 [
-                  { id: "findings" as const, label: "Analysis", icon: ListChecks },
-                  { id: "documents" as const, label: "Documents", icon: FileStack },
-                  { id: "compare" as const, label: "Compare", icon: Columns2 },
+                  { id: "findings" as const, label: t("review.viewAnalysis"), icon: ListChecks },
+                  { id: "documents" as const, label: t("review.viewDocuments"), icon: FileStack },
+                  { id: "compare" as const, label: t("review.viewCompare"), icon: Columns2 },
                 ] as const
               ).map((m) => (
                 <button
@@ -526,17 +636,22 @@ function ReviewRoomPage() {
                 </button>
               ))}
             </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/runs/$runId/mapping" params={{ runId }}>
-                <Link2 className="w-4 h-4 mr-1" />
-                Compliance mapping
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/runs/$runId/report" params={{ runId }}>
-                <ClipboardList className="w-4 h-4 mr-1" />{t("review.fullReport")}
-              </Link>
-            </Button>
+            <Link
+              to="/runs/$runId/mapping"
+              params={{ runId }}
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-1.5 py-1"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              {t("review.mappingShort")}
+            </Link>
+            <Link
+              to="/runs/$runId/report"
+              params={{ runId }}
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-1.5 py-1"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              {t("review.reportShort")}
+            </Link>
           </div>
         </div>
       </div>
@@ -548,19 +663,48 @@ function ReviewRoomPage() {
         </div>
       )}
 
+      {isStale && !isLive && (
+        <div
+          className={cn(
+            "border-b px-4 lg:px-6 py-2 flex items-center gap-3 text-xs",
+            isCriticallyStale
+              ? "bg-warning/10 text-warning-foreground"
+              : "bg-muted/50 text-muted-foreground",
+          )}
+        >
+          <Clock className={cn("w-3.5 h-3.5 shrink-0", isCriticallyStale ? "text-warning" : "text-muted-foreground")} />
+          <div className="min-w-0 flex-1">
+            <span className="font-medium text-foreground">
+              {isCriticallyStale ? t("review.staleCritical") : t("review.staleMinor")}
+            </span>
+            {runStaleness.reason ? (
+              <span className="text-muted-foreground"> — {runStaleness.reason}</span>
+            ) : null}
+          </div>
+          <Button
+            size="sm"
+            variant={isCriticallyStale ? "default" : "outline"}
+            className="h-7 px-2.5 text-xs shrink-0"
+            disabled={reanalysing}
+            onClick={onReanalyse}
+          >
+            {reanalysing ? (
+              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> {t("review.reanalysing")}</>
+            ) : (
+              <><RefreshCw className="w-3 h-3 mr-1" /> {t("review.reanalyse")}</>
+            )}
+          </Button>
+        </div>
+      )}
+
       {(viewMode === "documents" || viewMode === "compare") && (
         <div className="flex-1 min-h-0 flex flex-col">
           <PackWorkspace
             docs={(docs ?? []) as any}
             mode={viewMode === "compare" ? "compare" : "documents"}
-            focusDocId={focusEvidenceDoc?.id ?? supplierDoc?.id ?? null}
+            focusDocId={focusEvidenceDoc?.id ?? evidenceDoc?.id ?? null}
             initialSide={evidenceSide}
             quote={evidenceQuote || active?.finding?.evidence_quote || ""}
-            fallbackNeedle={
-              active
-                ? deriveFallbackNeedle(active.criterion.name, active.finding?.justification ?? null)
-                : ""
-            }
             severity={active?.finding?.severity}
             className="flex-1"
           />
@@ -568,7 +712,7 @@ function ReviewRoomPage() {
       )}
 
       {viewMode === "findings" && (
-      <div className="flex-1 grid min-h-0 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="flex-1 grid min-h-0 grid-cols-1 lg:grid-cols-[280px_minmax(0,1.05fr)_minmax(0,0.95fr)]">
         {/* LEFT — Decision panel */}
         <DecisionPanel
           runId={runId}
@@ -580,15 +724,12 @@ function ReviewRoomPage() {
           tenderPackHint={tenderPackHint}
           onPickBlocker={(id) => selectFinding(id)}
           staleness={runStaleness}
-          reanalysing={reanalysing}
-          onReanalyse={onReanalyse}
           reviewSigned={(run as any)?.review_status === "signed"}
         />
 
 
         {/* MIDDLE — Evidence stream */}
-        <div className="border-t lg:border-t-0 lg:border-l flex flex-col min-h-0 bg-background">
-          {/* Analyst filter chips */}
+        <div className="border-t lg:border-t-0 lg:border-l flex flex-col min-h-0 bg-muted/20">
           {rows.length > 0 && groups.length > 0 && (
             <AgentTabs
               groups={groups}
@@ -601,7 +742,7 @@ function ReviewRoomPage() {
           )}
 
           <ScrollArea className="flex-1">
-            <div className="p-4 lg:p-5 space-y-6">
+            <div className="p-4 lg:p-5 space-y-7">
               <ClausePairsTeaser runId={runId} />
               {streamGroups.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground p-8">
@@ -609,91 +750,172 @@ function ReviewRoomPage() {
                 </div>
               ) : streamGroups.map((g) => (
                 <section key={g.label}>
-                  <div className="flex items-center gap-2 mb-2 sticky top-0 bg-background/95 backdrop-blur py-1 z-[1]">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
-                    <div className="flex-1 h-px bg-border/60" />
+                  <div className="flex items-center gap-2 mb-3 sticky top-0 bg-muted/90 backdrop-blur-sm py-1 z-[1]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{g.label}</div>
+                    <div className="flex-1 h-px bg-border/70" />
                     <div className="text-[11px] text-muted-foreground tabular-nums">{g.items.length}</div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {g.items.map((r) => {
                       const fid = r.finding?.id ?? `pending-${r.criterion.id}`;
                       const isActive = active?.criterion.id === r.criterion.id;
                       return (
-                        <EvidenceCard
-                          key={fid}
-                          ref={registerCard(fid)}
-                          criterion={r.criterion}
-                          finding={r.finding}
-                          selected={isActive}
-                          onClick={() => r.finding && selectFinding(r.finding.id)}
-                        />
+                        <div key={fid} className="space-y-2">
+                          <EvidenceCard
+                            ref={registerCard(fid)}
+                            criterion={r.criterion}
+                            finding={r.finding}
+                            selected={isActive}
+                            onClick={() => r.finding && selectFinding(r.finding.id)}
+                          />
+                          {isActive && r.finding && (
+                            <OverridePanel finding={r.finding} onSaved={() => qc.invalidateQueries({ queryKey: ["findings", runId] })} />
+                          )}
+                        </div>
                       );
                     })}
                   </div>
                 </section>
               ))}
-
-              {/* Active-card override (kept out of the card to keep list scannable) */}
-              {active?.finding && (
-                <div className="pt-2">
-                  <OverridePanel finding={active.finding} onSaved={() => qc.invalidateQueries({ queryKey: ["findings", runId] })} />
-                </div>
-              )}
             </div>
           </ScrollArea>
         </div>
 
-        {/* RIGHT — Evidence document from the pack */}
-        <div className="flex flex-col min-h-0 bg-muted/10 border-t lg:border-t-0 lg:border-l">
-          <div className="border-b bg-background/80 px-4 lg:px-6 py-2.5 flex items-center gap-2 text-xs">
-            <FileText className="w-4 h-4 text-brand shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Evidence file
-                {supplierDocs.length > 1 ? ` · ${supplierDocs.length} in pack` : ""}
-              </div>
-              {supplierDocs.length > 1 ? (
-                <Select
-                  value={supplierDoc?.id ?? supplierDocs[0]?.id}
-                  onValueChange={(id) => setPackDocId(id)}
-                >
-                  <SelectTrigger className="h-7 mt-0.5 text-xs font-medium border-0 bg-transparent px-0 shadow-none focus:ring-0">
-                    <SelectValue placeholder="Select pack file" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supplierDocs.map((d) => (
-                      <SelectItem key={d.id} value={d.id} className="text-xs">
-                        {d.filename}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="truncate font-medium">{supplierDoc?.filename ?? "—"}</div>
+        {/* RIGHT — Evidence workbench */}
+        <div className="flex flex-col min-h-0 bg-paper/80 dark:bg-muted/20 border-t lg:border-t-0 lg:border-l">
+          <div className="shrink-0 border-b bg-background">
+            <div className="px-3 py-2 flex items-center gap-2">
+              {customerDocs.length > 0 && supplierDocs.length > 0 && (
+                <div className="inline-flex rounded-md border p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    className={cn(
+                      "h-6 px-2 text-[11px] rounded-[3px] transition-colors",
+                      paneSide === "supplier"
+                        ? "bg-muted font-medium text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => selectPaneSide("supplier")}
+                  >
+                    {t("dashboard.bidderPack")}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "h-6 px-2 text-[11px] rounded-[3px] transition-colors",
+                      paneSide === "customer"
+                        ? "bg-muted font-medium text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => selectPaneSide("customer")}
+                  >
+                    {t("dashboard.tenderPack")}
+                  </button>
+                </div>
               )}
+              <div className="min-w-0 flex-1">
+                {evidencePool.length > 1 ? (
+                  <Select
+                    value={evidenceDoc?.id ?? evidencePool[0]?.id}
+                    onValueChange={(id) => setPackDocId(id)}
+                  >
+                    <SelectTrigger className="h-7 text-xs font-medium border-0 bg-transparent px-0 shadow-none focus:ring-0">
+                      <SelectValue placeholder={t("review.evidenceFile")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {evidencePool.map((d) => (
+                        <SelectItem key={d.id} value={d.id} className="text-xs">
+                          {d.filename}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="truncate text-sm font-medium">{evidenceDoc?.filename ?? "—"}</div>
+                )}
+              </div>
+              {evidenceDoc && (
+                <span className="shrink-0 rounded border border-border/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {fileKindLabel(evidenceDoc)}
+                </span>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs shrink-0 text-muted-foreground"
+                onClick={() => goToView("documents")}
+              >
+                <FileStack className="w-3.5 h-3.5 mr-1" />
+                {t("review.openPack")}
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs shrink-0"
-              onClick={() => goToView("documents")}
-            >
-              <FileStack className="w-3.5 h-3.5 mr-1" />
-              Pack
-            </Button>
-            <VerdictBadge severity={active?.finding?.severity} size="sm" />
+            {active?.finding && (
+              <div className="px-3 pb-2.5">
+                <div className="rounded-md border bg-muted/40 px-2.5 py-2">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium leading-snug truncate">{active.criterion.name}</div>
+                      {locatorDisplay ? (
+                        <div className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                          “{locatorDisplay}”
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-[11px] text-muted-foreground">{t("review.noEvidenceTitle")}</div>
+                      )}
+                    </div>
+                    <VerdictBadge severity={active.finding.severity} size="sm" />
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    {locatorDisplay ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center text-[11px] font-medium text-brand hover:underline"
+                        onClick={() => scrollToEvidenceQuote(evidencePaneRef.current)}
+                      >
+                        <LocateFixed className="w-3 h-3 mr-1" />
+                        {t("review.jumpToQuote")}
+                      </button>
+                    ) : null}
+                    {locatorIsRelated && (
+                      <span className="text-[10px] text-muted-foreground">{t("review.relatedPassage")}</span>
+                    )}
+                    {evidenceMarks.length > 0 && (
+                      <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-critical" />
+                          {t("verdict.gap")}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                          {t("verdict.partial")}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-ok" />
+                          {t("verdict.aligned")}
+                        </span>
+                      </span>
+                    )}
+                    {evidenceLayout === "reconstructed" && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {t("review.reconstructedLayout")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-h-0">
+          <div ref={evidencePaneRef} className="flex-1 min-h-0">
             <DocumentViewer
-              doc={supplierDoc}
-              quote={active?.finding?.evidence_quote ?? ""}
-              fallbackNeedle={
-                active
-                  ? deriveFallbackNeedle(active.criterion.name, active.finding?.justification ?? null)
-                  : ""
-              }
+              doc={evidenceDoc}
+              quote={locatorDisplay}
               severity={active?.finding?.severity}
+              marks={evidenceMarks}
+              activeMarkId={active?.finding?.id ?? null}
+              onMarkClick={selectFinding}
+              chrome={false}
+              onLayout={onEvidenceLayout}
             />
           </div>
         </div>
@@ -704,66 +926,19 @@ function ReviewRoomPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Recommendation logic
+// Decision panel (left)
 // ---------------------------------------------------------------------------
 
 type Recommendation = {
-  kind: "do_not_sign" | "negotiate" | "safe";
+  kind: "do_not_sign" | "negotiate" | "safe" | "pending";
   headline: string;
   reason: string;
   score: number;
 };
 
-const HIGH_RISK_CATEGORIES = new Set(["DPA", "GDPR", "LEGAL", "IPR", "LIABILITY", "SECURITY", "INFOSEC"]);
-
-function computeRecommendation(
-  rows: Array<{ criterion: Criterion; finding: Finding | null }>,
-): Recommendation {
-  const c = { gap: 0, partial: 0, aligned: 0, not_addressed: 0 } as Record<Verdict, number>;
-  const highRiskGaps: string[] = [];
-  for (const r of rows) {
-    const v = toVerdict(r.finding?.severity);
-    c[v]++;
-    const cat = (r.criterion.category ?? "").trim().toUpperCase();
-    if (v === "gap" && HIGH_RISK_CATEGORIES.has(cat)) {
-      highRiskGaps.push(expandCategory(r.criterion.category));
-    }
-  }
-  const total = Math.max(rows.length, 1);
-  const score = Math.round(((c.aligned + c.partial * 0.4) / total) * 100);
-
-  if (highRiskGaps.length > 0) {
-    const uniq = Array.from(new Set(highRiskGaps)).slice(0, 3).join(", ");
-    return {
-      kind: "do_not_sign",
-      headline: "Do not sign",
-      reason: `Critical gap(s) in ${uniq}. Resolve before signature.`,
-      score,
-    };
-  }
-  if (c.gap > 0 || c.partial >= 3) {
-    return {
-      kind: "negotiate",
-      headline: "Negotiate before signing",
-      reason: `${c.gap} gap(s) and ${c.partial} partial match(es) need supplier response.`,
-      score,
-    };
-  }
-  return {
-    kind: "safe",
-    headline: "Safe to sign",
-    reason: "No blocking gaps. Confirm partial items with the reviewer, then proceed.",
-    score,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Decision panel (left)
-// ---------------------------------------------------------------------------
-
 function DecisionPanel({
   runId, recommendation, counts, totalCount, blockers, supplierFilename, tenderPackHint, onPickBlocker,
-  staleness, reanalysing, onReanalyse, reviewSigned,
+  staleness, reviewSigned,
 }: {
   runId: string;
   recommendation: Recommendation;
@@ -774,8 +949,6 @@ function DecisionPanel({
   tenderPackHint?: string | null;
   onPickBlocker: (findingId: string) => void;
   staleness: Staleness;
-  reanalysing: boolean;
-  onReanalyse: () => void;
   reviewSigned: boolean;
 }) {
 
@@ -790,90 +963,73 @@ function DecisionPanel({
     setReportViewed(true);
   };
   const kindTone =
-    recommendation.kind === "do_not_sign" ? { bg: "bg-critical/10", border: "border-critical/40", text: "text-critical", dot: "bg-critical" } :
-    recommendation.kind === "negotiate"   ? { bg: "bg-warning/10",  border: "border-warning/40",  text: "text-warning",  dot: "bg-warning" } :
-                                            { bg: "bg-ok/10",       border: "border-ok/40",       text: "text-ok",       dot: "bg-ok" };
-  const Icon = recommendation.kind === "do_not_sign" ? XCircle : recommendation.kind === "negotiate" ? AlertTriangle : CheckCircle2;
-  const isStale = staleness.level !== "fresh";
+    recommendation.kind === "do_not_sign" ? { bg: "bg-critical/8", border: "border-critical/30", text: "text-critical", accent: "bg-critical" } :
+    recommendation.kind === "negotiate"   ? { bg: "bg-warning/8",  border: "border-warning/30",  text: "text-warning",  accent: "bg-warning" } :
+    recommendation.kind === "pending"     ? { bg: "bg-muted/50",   border: "border-border",      text: "text-muted-foreground", accent: "bg-muted-foreground/50" } :
+                                            { bg: "bg-ok/8",       border: "border-ok/30",       text: "text-ok",       accent: "bg-ok" };
+  const Icon = recommendation.kind === "do_not_sign" ? XCircle : recommendation.kind === "negotiate" ? AlertTriangle : recommendation.kind === "pending" ? Loader2 : CheckCircle2;
   const isCriticallyStale = staleness.level === "critical";
+  const canSign = reviewSigned && reportViewed && !isCriticallyStale;
+  const nextStep: "review" | "report" | "sign" = !reviewSigned ? "review" : !reportViewed ? "report" : "sign";
+  const gateReason = isCriticallyStale
+    ? t("review.signBlocked")
+    : !reviewSigned
+    ? t("review.signGatedHint")
+    : !reportViewed
+    ? t("review.signGatedOnReport")
+    : t("review.decisionHint");
 
   return (
     <aside className="border-b lg:border-b-0 bg-background min-h-0 flex flex-col">
       <ScrollArea className="flex-1">
-        <div className="p-5 space-y-5">
-          {isStale && (
-            <div
-              className={`rounded-lg border p-3 text-xs leading-relaxed ${
-                isCriticallyStale
-                  ? "border-warning/50 bg-warning/10 text-warning-foreground"
-                  : "border-border bg-muted/40 text-foreground/80"
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <Clock className={`w-4 h-4 mt-0.5 shrink-0 ${isCriticallyStale ? "text-warning" : "text-muted-foreground"}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-foreground">
-                    {isCriticallyStale
-                      ? (t("review.staleCritical") ?? "This analysis is out of date")
-                      : (t("review.staleMinor") ?? "Newer analyst version available")}
-                  </div>
-                  <div className="mt-1">{staleness.reason}</div>
-                  <Button
-                    size="sm"
-                    variant={isCriticallyStale ? "default" : "outline"}
-                    className="mt-2 h-7 px-2 text-xs"
-                    disabled={reanalysing}
-                    onClick={onReanalyse}
-                  >
-                    {reanalysing ? (
-                      <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> {t("review.reanalysing") ?? "Re-analysing…"}</>
-                    ) : (
-                      <><RefreshCw className="w-3 h-3 mr-1" /> {t("review.reanalyse") ?? "Re-analyse now"}</>
-                    )}
-                  </Button>
+        <div className="p-5 space-y-6">
+          <div className={`relative overflow-hidden rounded-xl border ${kindTone.border} ${kindTone.bg} p-4`}>
+            <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${kindTone.accent}`} />
+            <div className="flex items-start justify-between gap-3 pl-1">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  {t("review.recommendation")}
+                </div>
+                <div className={`mt-1.5 flex items-center gap-2 ${kindTone.text}`}>
+                  <Icon className={cn("w-5 h-5 shrink-0", recommendation.kind === "pending" && "animate-spin")} />
+                  <div className="text-[15px] font-semibold leading-snug">{recommendation.headline}</div>
                 </div>
               </div>
-            </div>
-          )}
-
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-              {t("review.recommendation") ?? "Recommendation"}
-            </div>
-            <div className={`rounded-lg border ${kindTone.border} ${kindTone.bg} p-4`}>
-              <div className={`flex items-center gap-2 ${kindTone.text}`}>
-                <Icon className="w-5 h-5" />
-                <div className="text-base font-semibold">{recommendation.headline}</div>
+              {recommendation.kind !== "pending" && (
+              <div className="text-right shrink-0">
+                <div className="text-2xl font-semibold tabular-nums tracking-tight leading-none">{recommendation.score}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{t("review.scoreOf")}</div>
               </div>
-              <p className="text-sm text-foreground/80 mt-2 leading-relaxed">{recommendation.reason}</p>
-              <div className="mt-3 flex items-baseline gap-2">
-                <div className="text-2xl font-semibold tabular-nums">{recommendation.score}</div>
-                <div className="text-xs text-muted-foreground">/ 100 score</div>
-              </div>
+              )}
             </div>
+            <p className="text-sm text-foreground/75 mt-2.5 leading-relaxed pl-1">{recommendation.reason}</p>
           </div>
 
           {(supplierFilename || tenderPackHint) && (
-            <div className="text-xs space-y-2">
+            <div className="space-y-2.5">
               {tenderPackHint && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                    {t("runDetail.customer") ?? "Tender"}
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5 h-7 w-7 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 grid place-items-center shrink-0">
+                    <FileText className="w-3.5 h-3.5" />
                   </div>
-                  <div className="flex items-start gap-2 text-foreground/90">
-                    <FileText className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                    <span className="break-all leading-snug">{tenderPackHint}</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {t("runDetail.customer")}
+                    </div>
+                    <div className="text-xs text-foreground/90 leading-snug mt-0.5 break-all">{tenderPackHint}</div>
                   </div>
                 </div>
               )}
               {supplierFilename && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                    {t("runDetail.supplier")}
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5 h-7 w-7 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 grid place-items-center shrink-0">
+                    <FileStack className="w-3.5 h-3.5" />
                   </div>
-                  <div className="flex items-start gap-2 text-foreground/90">
-                    <FileText className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                    <span className="break-all leading-snug">{supplierFilename}</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {t("runDetail.supplier")}
+                    </div>
+                    <div className="text-xs text-foreground/90 leading-snug mt-0.5 break-all">{supplierFilename}</div>
                   </div>
                 </div>
               )}
@@ -881,23 +1037,18 @@ function DecisionPanel({
           )}
 
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-              {t("review.coverage") ?? "Coverage"}
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2.5">
+              {t("review.coverage")}
             </div>
-            <div className="space-y-1.5">
-              <CoverageBar label={t("verdict.gap")} n={counts.gap} total={totalCount} verdict="gap" />
-              <CoverageBar label={t("verdict.partial")} n={counts.partial} total={totalCount} verdict="partial" />
-              <CoverageBar label={t("verdict.aligned")} n={counts.aligned} total={totalCount} verdict="aligned" />
-              <CoverageBar label={t("verdict.notAddressed")} n={counts.not_addressed} total={totalCount} verdict="not_addressed" />
-            </div>
+            <CoverageStack counts={counts} total={totalCount} t={t} />
           </div>
 
           {blockers.length > 0 && (
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-                {t("review.topBlockers") ?? "Top items to review"}
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2.5">
+                {t("review.topBlockers")}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {blockers.map((b) => {
                   const v = toVerdict(b.finding?.severity);
                   const tone = verdictTone[v];
@@ -905,13 +1056,13 @@ function DecisionPanel({
                     <button
                       key={b.finding!.id}
                       onClick={() => onPickBlocker(b.finding!.id)}
-                      className="w-full text-left rounded-md border border-border/60 hover:border-border bg-background hover:bg-muted/40 px-2.5 py-2 transition-colors"
+                      className="w-full text-left rounded-lg px-2.5 py-2 hover:bg-muted/60 transition-colors"
                     >
                       <div className="flex items-start gap-2">
                         <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${tone.dot}`} />
                         <div className="min-w-0">
                           <div className="text-xs font-medium leading-snug line-clamp-2">{b.criterion.name}</div>
-                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
                             {expandCategory(b.criterion.category)}
                           </div>
                         </div>
@@ -923,92 +1074,116 @@ function DecisionPanel({
             </div>
           )}
 
-          <div className="pt-2 border-t space-y-2">
-            {/* Step 1 — Review Checklist */}
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
-              <span>{t("review.workflowStep1") ?? "Step 1 · Review Checklist"}</span>
-              {reviewSigned && <span className="text-ok normal-case tracking-normal">✓ {t("review.signedOff") ?? "Signed off"}</span>}
+          <div className="pt-4 border-t space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {t("review.nextSteps")}
+              </div>
+              <div className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground">
+                <span className={reviewSigned ? "text-ok font-medium" : nextStep === "review" ? "text-foreground font-medium" : ""}>1</span>
+                <span className="opacity-40">·</span>
+                <span className={reportViewed ? "text-ok font-medium" : nextStep === "report" ? "text-foreground font-medium" : ""}>2</span>
+                <span className="opacity-40">·</span>
+                <span className={canSign || nextStep === "sign" ? "text-foreground font-medium" : ""}>3</span>
+              </div>
             </div>
-            <Button asChild className="w-full" variant={reviewSigned ? "outline" : "default"}>
-              <Link to="/runs/$runId/review" params={{ runId }}>
-                <ClipboardList className="w-4 h-4 mr-1" />
-                {reviewSigned
-                  ? (t("review.reopenChecklist") ?? "Reopen Review Checklist")
-                  : (t("review.openChecklist") ?? "Open Review Checklist")}
-              </Link>
-            </Button>
 
-            {/* Step 2 — Full report */}
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground pt-1">
-              <span>{t("review.workflowStep2") ?? "Step 2 · Full report"}</span>
-              {reportViewed && <span className="text-ok normal-case tracking-normal">✓ {t("review.viewed") ?? "Viewed"}</span>}
+            {nextStep === "review" && (
+              <Button asChild className="w-full">
+                <Link to="/runs/$runId/review" params={{ runId }}>
+                  <ClipboardList className="w-4 h-4 mr-1" />
+                  {t("review.openChecklist")}
+                </Link>
+              </Button>
+            )}
+            {nextStep === "report" && (
+              <Button asChild className="w-full">
+                <Link to="/runs/$runId/report" params={{ runId }} hash="gap-report" onClick={markReportViewed}>
+                  <ClipboardList className="w-4 h-4 mr-1" />
+                  {t("review.fullReport")}
+                </Link>
+              </Button>
+            )}
+            {nextStep === "sign" && (
+              canSign ? (
+                <Button asChild className="w-full">
+                  <Link to="/runs/$runId/sign" params={{ runId }}>
+                    {t("review.decideAndSign")}
+                  </Link>
+                </Button>
+              ) : (
+                <Button className="w-full" variant="default" disabled title={gateReason}>
+                  <Lock className="w-4 h-4 mr-1.5" />
+                  {t("review.decideAndSign")}
+                </Button>
+              )
+            )}
+
+            <div className="flex items-center gap-3 text-xs">
+              {nextStep !== "review" && (
+                <Link to="/runs/$runId/review" params={{ runId }} className="text-muted-foreground hover:text-foreground">
+                  {reviewSigned ? t("review.reopenChecklist") : t("review.openChecklist")}
+                </Link>
+              )}
+              {nextStep !== "report" && (
+                <Link
+                  to="/runs/$runId/report"
+                  params={{ runId }}
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={markReportViewed}
+                >
+                  {t("review.reportShort")}
+                </Link>
+              )}
+              {nextStep !== "sign" && (
+                <span className="text-muted-foreground/70 inline-flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  {t("review.decideAndSign")}
+                </span>
+              )}
             </div>
-            <Button asChild className="w-full" variant={reportViewed ? "outline" : "default"} onClick={markReportViewed}>
-              <Link to="/runs/$runId/report" params={{ runId }}>
-                <ClipboardList className="w-4 h-4 mr-1" /> {t("review.fullReport")}
-              </Link>
-            </Button>
-
-            {/* Step 3 — Decide & sign (always visible; disabled until steps 1 & 2 complete) */}
-            {(() => {
-              const canSign = reviewSigned && reportViewed && !isCriticallyStale;
-              const gateReason = isCriticallyStale
-                ? (t("review.signBlocked") ?? "Signing is disabled until the analysis is re-run against the current document text.")
-                : !reviewSigned
-                ? (t("review.signGatedHint") ?? "Complete the Review Checklist to unlock the final decision.")
-                : !reportViewed
-                ? (t("review.signGatedOnReport") ?? "Open the Full Report to unlock the final decision.")
-                : (t("review.decisionHint") ?? "The recommendation is guidance. A human reviewer must sign to finalise.");
-              return (
-                <>
-                  <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground pt-1">
-                    <span>{t("review.workflowStep3") ?? "Step 3 · Decide & sign"}</span>
-                    {!canSign && !isCriticallyStale && (
-                      <span className="normal-case tracking-normal text-muted-foreground/70 inline-flex items-center gap-1">
-                        <Lock className="w-3 h-3" /> {t("review.locked") ?? "Locked"}
-                      </span>
-                    )}
-                  </div>
-                  {canSign ? (
-                    <Button asChild className="w-full" variant="default">
-                      <Link to="/runs/$runId/sign" params={{ runId }}>
-                        {t("review.decideAndSign") ?? "Decide & sign"}
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button className="w-full" variant="default" disabled title={gateReason}>
-                      <Lock className="w-4 h-4 mr-1.5" />
-                      {t("review.decideAndSign") ?? "Decide & sign"}
-                    </Button>
-                  )}
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{gateReason}</p>
-                </>
-              );
-            })()}
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{gateReason}</p>
           </div>
-
-
-
         </div>
       </ScrollArea>
     </aside>
   );
 }
 
-function CoverageBar({ label, n, total, verdict }: { label: string; n: number; total: number; verdict: Verdict }) {
-  const tone = verdictTone[verdict];
-  const pct = total > 0 ? Math.round((n / total) * 100) : 0;
+function CoverageStack({
+  counts, total, t,
+}: {
+  counts: Record<Verdict, number>;
+  total: number;
+  t: TFunction;
+}) {
+  const parts: { verdict: Verdict; n: number; className: string }[] = [
+    { verdict: "gap", n: counts.gap, className: "bg-critical" },
+    { verdict: "partial", n: counts.partial, className: "bg-warning" },
+    { verdict: "aligned", n: counts.aligned, className: "bg-ok" },
+    { verdict: "not_addressed", n: counts.not_addressed, className: "bg-muted-foreground/40" },
+  ];
   return (
     <div>
-      <div className="flex items-center justify-between text-[11px] mb-0.5">
-        <span className="inline-flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
-          <span className="text-muted-foreground">{label}</span>
-        </span>
-        <span className="tabular-nums font-medium">{n}</span>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+        {parts.map((p) =>
+          p.n > 0 ? (
+            <div
+              key={p.verdict}
+              className={p.className}
+              style={{ width: `${Math.max(total > 0 ? (p.n / total) * 100 : 0, 0)}%` }}
+            />
+          ) : null,
+        )}
       </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full ${tone.dot}`} style={{ width: `${pct}%` }} />
+      <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+        {parts.filter((p) => p.n > 0 || p.verdict !== "not_addressed").map((p) => (
+          <span key={p.verdict} className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span className={`w-1.5 h-1.5 rounded-full ${p.className}`} />
+            {t(`verdict.${p.verdict === "not_addressed" ? "notAddressed" : p.verdict}`)}
+            <span className="font-medium tabular-nums text-foreground">{p.n}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1035,37 +1210,32 @@ const EvidenceCard = React.forwardRef<
       ref={ref}
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg border p-3.5 transition-all ${
+      className={cn(
+        "w-full text-left rounded-xl border bg-background p-4 transition-all",
         selected
-          ? `${tone.border} ${tone.bg} shadow-sm ring-1 ring-current/10`
-          : "border-border/60 bg-background hover:border-border hover:bg-muted/30"
-      }`}
+          ? "border-transparent shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+          : "border-border/70 hover:border-border hover:bg-background/80",
+      )}
     >
       <div className="flex items-start gap-3">
-        <div className={`w-1 self-stretch rounded-full ${tone.dot} shrink-0`} />
+        <div className={cn("w-[3px] self-stretch rounded-full shrink-0", tone.dot)} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-medium leading-snug flex-1">{criterion.name}</div>
             <VerdictBadge severity={finding?.severity} size="sm" />
           </div>
           {finding?.justification && (
-            <p className="text-[12.5px] text-foreground/75 mt-1.5 leading-relaxed line-clamp-3">
+            <p className="text-[13px] text-foreground/70 mt-2 leading-relaxed line-clamp-2">
               {finding.justification}
             </p>
           )}
           {finding?.evidence_quote && (
-            <blockquote className={`mt-2 border-l-2 ${tone.border} pl-2.5 text-[12px] italic text-foreground/70 line-clamp-2`}>
+            <blockquote className={cn("mt-2.5 border-l-2 pl-3 text-[12.5px] text-foreground/65 leading-relaxed line-clamp-2", tone.border)}>
               “{finding.evidence_quote}”
             </blockquote>
           )}
-          {finding?.evidence_quote && (
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <ExternalLink className="w-3 h-3" />
-              <span>{selected ? t("review.showingInDocument") ?? "Showing in document →" : t("review.clickToLocate") ?? "Click to locate in document"}</span>
-            </div>
-          )}
           {!finding && (
-            <div className="text-[12px] text-muted-foreground italic mt-1">
+            <div className="text-[12px] text-muted-foreground mt-1.5">
               {t("review.pending")}
             </div>
           )}
@@ -1079,7 +1249,7 @@ function CountChip({ verdict, n }: { verdict: Verdict; n: number }) {
   const { t } = useTranslation();
   const tone = verdictTone[verdict];
   return (
-    <div className={`inline-flex items-center gap-1.5 rounded-full border ${tone.border} ${tone.bg} px-2 py-0.5 text-xs`}>
+    <div className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs ${tone.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
       <span className="text-muted-foreground">{t(`verdict.${verdict === "not_addressed" ? "notAddressed" : verdict}`)}</span>
       <span className="font-semibold tabular-nums">{n}</span>
@@ -1129,7 +1299,7 @@ function AgentTabs({
   };
 
   return (
-    <div className="border-b bg-muted/30 px-3 py-2.5">
+    <div className="border-b bg-background px-3 py-2">
       <div className="relative flex items-center gap-2">
         <button
           type="button"
@@ -1206,18 +1376,18 @@ function AgentTab({
       type="button"
       title={label}
       onClick={onClick}
-      className={`group flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-all ${
+      className={`group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-all ${
         selected
-          ? "border-brand bg-background text-foreground shadow-sm ring-1 ring-brand/20"
-          : "border-border/60 bg-background/40 hover:border-border hover:bg-background text-muted-foreground hover:text-foreground"
+          ? "bg-muted text-foreground font-medium"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
       }`}
     >
       <span className={`font-medium whitespace-nowrap ${selected ? "text-foreground" : ""}`}>
         <span className="hidden md:inline">{label}</span>
         <span className="md:hidden">{shortLabel}</span>
       </span>
-      <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-md px-1.5 text-[11px] font-semibold tabular-nums ${
-        selected ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground"
+      <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-5 rounded px-1 text-[11px] font-semibold tabular-nums ${
+        selected ? "bg-background text-foreground" : "bg-muted/80 text-muted-foreground"
       }`}>
         {total}
       </span>
@@ -1638,28 +1808,31 @@ function OverridePanel({ finding, onSaved }: { finding: Finding; onSaved: () => 
 
   if (!editing) {
     return (
-      <div className="mt-6 flex items-center gap-2 flex-wrap">
-        <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-          <ExternalLink className="w-3.5 h-3.5 mr-1" /> {t("review.disagree")}
-        </Button>
+      <div className="px-1">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          <PenLine className="w-3 h-3" />
+          {t("review.disagree")}
+        </button>
       </div>
     );
   }
   return (
-    <Card className="mt-6">
-      <CardContent className="p-4 space-y-3">
-        <div className="text-xs font-medium">{t("review.changeVerdict")}</div>
-        <Textarea rows={2} placeholder={t("review.notePlaceholder")} value={note} onChange={(e) => setNote(e.target.value)} />
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => save("ok")}    className="border-ok/40 text-ok hover:bg-ok/10">{t("verdict.aligned")}</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => save("warning")} className="border-warning/40 text-warning hover:bg-warning/10">{t("verdict.partial")}</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => save("critical")} className="border-critical/40 text-critical hover:bg-critical/10">{t("verdict.gap")}</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => save("na")}    >{t("verdict.notAddressed")}</Button>
-          <div className="flex-1" />
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setEditing(false); setNote(""); }}>{t("common.cancel")}</Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border bg-background p-3 space-y-2.5">
+      <div className="text-xs font-medium">{t("review.changeVerdict")}</div>
+      <Textarea rows={2} placeholder={t("review.notePlaceholder")} value={note} onChange={(e) => setNote(e.target.value)} />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => save("ok")}    className="border-ok/40 text-ok hover:bg-ok/10">{t("verdict.aligned")}</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => save("warning")} className="border-warning/40 text-warning hover:bg-warning/10">{t("verdict.partial")}</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => save("critical")} className="border-critical/40 text-critical hover:bg-critical/10">{t("verdict.gap")}</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => save("na")}    >{t("verdict.notAddressed")}</Button>
+        <div className="flex-1" />
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setEditing(false); setNote(""); }}>{t("common.cancel")}</Button>
+      </div>
+    </div>
   );
 }
 

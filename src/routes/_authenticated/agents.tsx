@@ -15,7 +15,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/agents")({
-  head: () => ({ meta: [{ title: "Agents — Clause" }] }),
+  head: () => ({ meta: [{ title: "Agents — Counterpart" }] }),
   component: AgentsPage,
 });
 
@@ -74,7 +74,7 @@ function AgentsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-10">
-      <div className="max-w-3xl space-y-2">
+      <div className="max-w-3xl space-y-2" data-tour-stage="agents">
         <PageBack label="Back" fallback={{ to: "/runs" }} />
         <PageBreadcrumbs items={[{ label: "Analyses", to: "/runs" }, { label: t("agentsPage.title") }]} />
         <h1 className="text-2xl font-semibold tracking-tight">{t("agentsPage.title")}</h1>

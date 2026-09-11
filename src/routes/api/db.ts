@@ -127,6 +127,23 @@ export const Route = createFileRoute("/api/db")({
 
             const filters = [...(body.filters ?? [])];
 
+            if (body.table === "user_roles" && body.action !== "select") {
+              const sql = getSql();
+              const admin = await sql`
+                SELECT 1 FROM user_roles
+                WHERE user_id = ${session.user.id} AND role = 'admin'::app_role
+                LIMIT 1
+              `;
+              if (!admin.length) {
+                return Response.json({ data: null, error: { message: "Platform admin only" } }, { status: 403 });
+              }
+            }
+
+            if (body.table === "profiles" && (body.action === "update" || body.action === "delete")) {
+              const self = filters.some((f) => f.col === "id" && f.value === session.user.id);
+              if (!self) filters.push({ type: "eq", col: "id", value: session.user.id });
+            }
+
             // Soft workspace isolation: for workspace-scoped tables, require membership
             // and inject workspace_id when the client omitted it.
             const WORKSPACE_TABLES = new Set([
@@ -142,9 +159,11 @@ export const Route = createFileRoute("/api/db")({
               "decisions",
               "negotiation_items",
               "error_logs",
-              "schedules",
+              "analysis_schedules",
               "prompt_versions",
               "llm_usage",
+              "audit_logs",
+              "notifications",
             ]);
             if (WORKSPACE_TABLES.has(body.table)) {
               const sql = getSql();

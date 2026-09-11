@@ -14,12 +14,13 @@ import { Download, Link2, ListChecks, Loader2, RefreshCw, Table2 } from "lucide-
 import { useClausePairs } from "@/components/pack/clause-pairs-panel";
 import { MappingWorkspace } from "@/components/pack/mapping-workspace";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { OnboardingStepMarker } from "@/components/onboarding-step-marker";
 import { remapClauses } from "@/lib/remap-clauses.functions";
 import { exportMappingCsv, exportMappingPdf } from "@/lib/export-mapping";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/runs/$runId_/mapping")({
-  head: () => ({ meta: [{ title: "Compliance mapping — Clause" }] }),
+  head: () => ({ meta: [{ title: "Compliance mapping — Counterpart" }] }),
   component: MappingPage,
 });
 
@@ -113,6 +114,7 @@ function MappingPage() {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+      <OnboardingStepMarker step="opened_mapping" />
       <div className="border-b bg-background/80 backdrop-blur px-4 lg:px-6 py-3 sticky top-0 z-20">
         <div className="flex items-center justify-between gap-3 flex-wrap max-w-6xl mx-auto w-full">
           <div className="flex items-center gap-3 min-w-0">

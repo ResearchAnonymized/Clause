@@ -1,7 +1,8 @@
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import mammoth from "mammoth";
-import { createAiProvider } from "@/lib/ai-gateway.server";
+import { createAiProvider, routedModelFromResult } from "@/lib/ai-gateway.server";
+import { AUTO_ROUTER_MODEL } from "@/lib/agent-defaults";
 import type { RetrievedChunk } from "@/lib/rag-retrieve.server";
 import { recordLlmUsage } from "@/lib/llm-usage.server";
 
@@ -88,6 +89,7 @@ You MUST:
 - Copy the "evidence_quote" VERBATIM from ONE of the supplier excerpts (max 240 chars). No paraphrase.
 - Set "evidence_chunk_id" to the id of that supplier excerpt (given inline as id=<uuid>).
 - If NONE of the excerpts contain information relevant to the criterion, answer "na" with severity "warning", set evidence_quote to "" and evidence_chunk_id to "", and explain in justification that the retrieved excerpts do not address the criterion. This is the correct, expected answer when the topic is missing.
+- Justification MUST be specific to THIS bid: include at least one concrete figure, product name, annex title, or proper noun copied from the excerpts. Do not write interchangeable sentences such as "the supplier confirms an SLA".
 
 Return a strict JSON object:
 - answer: "yes" (supplier meets criterion), "no" (fails materially), or "na" (unclear / not addressed).
@@ -112,9 +114,10 @@ export async function analyseCriterion(params: {
   systemPrompt?: string | null;
   /** Optional mapped clause context */
   mappedPairsHint?: string | null;
+  packContext?: { bidderFiles?: string[]; tenderFiles?: string[] } | null;
 }): Promise<AgentFinding> {
   const gateway = makeGateway();
-  const model = gateway(params.model || process.env.AI_DEFAULT_MODEL || "gpt-4o-mini");
+  const model = gateway(params.model || process.env.AI_DEFAULT_MODEL || AUTO_ROUTER_MODEL);
 
   const promptOverride = params.criterionPrompt?.trim();
   const supplierBlock = params.supplierChunks.length
@@ -134,12 +137,18 @@ export async function analyseCriterion(params: {
     `CRITERION: ${params.criterionName}`,
     `CATEGORY: ${params.criterionCategory}`,
     promptOverride ? `EXPECTATION: ${promptOverride}` : "",
+    params.packContext?.bidderFiles?.length
+      ? `BIDDER FILES IN THIS RUN: ${params.packContext.bidderFiles.join(", ")}`
+      : "",
+    params.packContext?.tenderFiles?.length
+      ? `TENDER FILES IN THIS RUN: ${params.packContext.tenderFiles.join(", ")}`
+      : "",
     params.mappedPairsHint ? `\nMAPPED CLAUSE CONTEXT:\n${params.mappedPairsHint}` : "",
     "",
-    "CUSTOMER TEMPLATE EXCERPTS:",
+    "TENDER / CUSTOMER EXCERPTS (this pack only):",
     customerBlock,
     "",
-    "SUPPLIER CONTRACT EXCERPTS:",
+    "BIDDER / SUPPLIER EXCERPTS (this pack only):",
     supplierBlock,
     "",
     "Return the JSON object described in the system prompt. No prose outside JSON.",
@@ -147,7 +156,7 @@ export async function analyseCriterion(params: {
     .filter(Boolean)
     .join("\n");
 
-  const modelId = params.model || process.env.AI_DEFAULT_MODEL || "gpt-4o-mini";
+  const modelId = params.model || process.env.AI_DEFAULT_MODEL || AUTO_ROUTER_MODEL;
   try {
     const result = await generateText({
       model,
@@ -156,7 +165,7 @@ export async function analyseCriterion(params: {
       output: Output.object({ schema: FindingSchema }),
     });
     recordLlmUsage({
-      model: modelId,
+      model: routedModelFromResult(result, modelId),
       usage: result.usage,
       agent_name: `${params.criterionCategory} Agent`,
       stage: "specialists",
@@ -185,7 +194,7 @@ export async function analyseCriterion(params: {
           output: Output.object({ schema: FindingSchema }),
         });
         recordLlmUsage({
-          model: modelId,
+          model: routedModelFromResult(retry, modelId),
           usage: retry.usage,
           agent_name: `${params.criterionCategory} Agent`,
           stage: "specialists",

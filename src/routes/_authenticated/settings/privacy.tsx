@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings/privacy")({
-  head: () => ({ meta: [{ title: "Privacy & data — Clause" }] }),
+  head: () => ({ meta: [{ title: "Privacy & data — Counterpart" }] }),
   component: PrivacyPage,
 });
 
@@ -145,7 +145,7 @@ function PrivacyPage() {
                 <AlertDialogTitle>Request account deletion?</AlertDialogTitle>
                 <AlertDialogDescription>
                   Workspace admins will be notified and your account will be removed within 30 days.
-                  You can keep using Clause until then; export your data first if you need a copy.
+                  You can keep using Counterpart until then; export your data first if you need a copy.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

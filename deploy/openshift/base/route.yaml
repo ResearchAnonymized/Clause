@@ -1,0 +1,21 @@
+# OpenShift Route. Leave spec.host empty to get the default
+# <name>-<namespace>.apps.<cluster> hostname, then copy that URL into the Secret APP_URL.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: counterpart
+  namespace: counterpart
+  labels:
+    app.kubernetes.io/name: counterpart
+    app.kubernetes.io/component: app
+spec:
+  to:
+    kind: Service
+    name: counterpart-app
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

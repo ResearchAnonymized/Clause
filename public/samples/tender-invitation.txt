@@ -1,0 +1,24 @@
+INVITATION TO TENDER
+Wellbeing Services County ICT platform services
+Contracting authority: North Shore Wellbeing Area (sample pack for training — not a live procurement)
+
+1. Subject
+The contracting authority invites tenders for the delivery, operation and support of a cloud-hosted case-management platform for social and health services, including integrations to national Kanta services where applicable.
+
+2. Procedure
+Open procedure under Finnish public procurement rules (Hankintalaki). Language of the tender: Finnish or English.
+
+3. Mandatory requirements (extract)
+3.1 Availability. The production service SHALL achieve 99.9% monthly availability, measured excluding agreed maintenance windows published 14 days in advance.
+3.2 Incident response. Priority-1 incidents SHALL be acknowledged within 15 minutes and restored within 4 hours.
+3.3 Service credits. Availability below 99.9% SHALL trigger service credits of at least 5% of the monthly fee per 0.1 percentage point shortfall, capped at 25% of the monthly fee.
+3.4 Sub-processors. The supplier SHALL maintain a current list of sub-processors and notify the customer in writing at least 30 days before adding a sub-processor that processes personal data.
+3.5 Audit. The customer SHALL have the right to audit security and personal-data processing once per year, and after a personal-data breach, on 10 business days' notice.
+3.6 Exit. On termination, the supplier SHALL provide exit assistance for 90 days and return or securely destroy customer data within 30 days of the exit period ending.
+3.7 Liability. Liability for personal-data breaches SHALL NOT be included in the general liability cap.
+
+4. Award criteria
+Quality 60% / price 40%. Quality includes SLA evidence, information security, and GDPR operating model.
+
+5. Tender contents
+Bidders must submit: (a) technical offer, (b) price schedule, (c) draft DPA, (d) ISO 27001 certificate or equivalent description.

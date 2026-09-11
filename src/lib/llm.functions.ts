@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createAiProvider } from "@/lib/ai-gateway.server";
+import { createAiProvider, routedModelFromResult, withCostTier } from "@/lib/ai-gateway.server";
 import { generateText } from "ai";
 
 const TestInput = z.object({
   model: z.string().min(1).max(200),
+  cost_tier: z.string().optional(),
 });
 
 /** Ping the configured AI gateway with the selected model. */
@@ -21,19 +22,22 @@ export const testLlmConnection = createServerFn({ method: "POST" })
       };
     }
     try {
-      const gateway = createAiProvider();
-      const { text } = await generateText({
-        model: gateway(data.model),
-        prompt: 'Reply with exactly the word "OK" and nothing else.',
-        maxOutputTokens: 16,
+      return await withCostTier(data.cost_tier, async () => {
+        const gateway = createAiProvider();
+        const { text, response } = await generateText({
+          model: gateway(data.model),
+          prompt: 'Reply with exactly the word "OK" and nothing else.',
+          maxOutputTokens: 16,
+        });
+        const reply = (text || "").trim();
+        return {
+          ok: true as const,
+          model: data.model,
+          routed: routedModelFromResult({ response }, data.model),
+          reply: reply.slice(0, 80),
+          baseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
+        };
       });
-      const reply = (text || "").trim();
-      return {
-        ok: true as const,
-        model: data.model,
-        reply: reply.slice(0, 80),
-        baseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
-      };
     } catch (err: any) {
       return {
         ok: false as const,
@@ -56,7 +60,7 @@ export const listAvailableModels = createServerFn({ method: "POST" })
         headers: {
           Authorization: `Bearer ${key}`,
           "HTTP-Referer": process.env.APP_URL || "http://localhost:3000",
-          "X-Title": "Clause",
+          "X-Title": "Counterpart",
         },
       });
       if (!res.ok) {
@@ -67,6 +71,7 @@ export const listAvailableModels = createServerFn({ method: "POST" })
         .map((m) => m.id)
         .filter(Boolean)
         .sort();
+      if (!models.includes("openrouter/auto")) models.unshift("openrouter/auto");
       return { ok: true as const, provider: "openrouter", models };
     } catch (err: any) {
       return { ok: false as const, error: String(err?.message ?? err), models: [] as string[] };

@@ -26,7 +26,7 @@ import {
 import type { LlmConfig } from "@/lib/agent-defaults";
 
 export const Route = createFileRoute("/_authenticated/settings/pipeline")({
-  head: () => ({ meta: [{ title: "Pipeline DAG — Clause" }] }),
+  head: () => ({ meta: [{ title: "Pipeline DAG — Counterpart" }] }),
   component: PipelineDagPage,
 });
 

@@ -6,6 +6,7 @@ import {
   pipelineFromLlmExtra,
   specialistConcurrency,
 } from "@/lib/pipeline-dag";
+import { findQuoteInText } from "@/lib/highlight-quote";
 import { aggregateUsage, estimateCostUsd, normalizeSdkUsage } from "@/lib/llm-usage";
 
 describe("clause AST", () => {
@@ -26,6 +27,24 @@ describe("clause AST", () => {
     expect(ast.stats.list_items).toBe(2);
     expect(ast.stats.tables).toBeGreaterThanOrEqual(1);
     expect(ast.blocks.some((b) => b.clause_ref?.includes("§"))).toBe(true);
+  });
+
+  it("treats numbered titles as headings, not list items", () => {
+    const ast = buildClauseAstFromText(
+      ["1. Executive summary", "", "Body of the bid.", "", "1. The Supplier shall maintain 99.9% availability."].join(
+        "\n",
+      ),
+    );
+    expect(ast.blocks[0]?.type).toBe("heading");
+    expect(ast.blocks[0]?.text).toMatch(/Executive summary/);
+    expect(ast.blocks.some((b) => b.type === "list_item" && /99\.9%/.test(b.text))).toBe(true);
+    expect(ast.blocks.some((b) => b.type === "heading" && /0\.6 FTE/.test(b.text))).toBe(false);
+  });
+
+  it("does not treat calendar dates as numbered headings", () => {
+    const ast = buildClauseAstFromText(["Issue date", "", "14 August 2026", "", "1. Procurement overview"].join("\n"));
+    expect(ast.blocks.some((b) => b.type === "heading" && /14 August/.test(b.text))).toBe(false);
+    expect(ast.blocks.some((b) => b.type === "heading" && /Procurement overview/.test(b.text))).toBe(true);
   });
 
   it("parses HTML headings from DOCX-style markup", () => {
@@ -90,5 +109,13 @@ describe("llm usage", () => {
     expect(agg.cost_usd).toBeCloseTo(0.03, 5);
     expect(agg.estimated).toBe(true);
     expect(agg.calls).toBe(2);
+  });
+});
+
+describe("evidence quotes", () => {
+  it("finds a verbatim bid sentence", () => {
+    const text = "Prices are fixed for the initial 36-month term except for statutory taxes.";
+    const found = findQuoteInText(text, "Prices are fixed for the initial 36-month term except for statutory taxes");
+    expect(found.hit).toContain("Prices are fixed");
   });
 });

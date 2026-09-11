@@ -4,15 +4,54 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 function useLocalFs() {
-  return process.env.STORAGE_DRIVER === "fs" || !process.env.STORAGE_ENDPOINT;
+  const driver = String(process.env.STORAGE_DRIVER || "").trim().toLowerCase();
+  if (driver === "fs" || driver === "file" || driver === "local") return true;
+  return !String(process.env.STORAGE_ENDPOINT || "").trim();
+}
+
+/** Walk up from a starting directory until package.json is found. */
+function findPackageRoot(start: string): string | null {
+  let dir = path.resolve(start);
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(path.join(dir, "package.json"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+/**
+ * Vite SSR workers do not always share the repo cwd. Resolve relative
+ * STORAGE_LOCAL_PATH against the app root so uploads and later reads hit
+ * the same folder.
+ */
+function projectRoot(): string {
+  for (const candidate of [process.env.CLAUSE_ROOT, process.env.INIT_CWD, process.cwd()]) {
+    if (!candidate) continue;
+    const hit = findPackageRoot(candidate);
+    if (hit) return hit;
+  }
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const hit = findPackageRoot(here);
+    if (hit) return hit;
+  } catch {
+    /* bundled without a filesystem URL */
+  }
+  return process.cwd();
 }
 
 function localRoot() {
-  return process.env.STORAGE_LOCAL_PATH || path.join(process.cwd(), "storage");
+  const configured = process.env.STORAGE_LOCAL_PATH || "storage";
+  if (path.isAbsolute(configured)) return configured;
+  return path.resolve(projectRoot(), configured);
 }
 
 function getS3() {

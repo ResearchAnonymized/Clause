@@ -137,7 +137,7 @@ export function AnalysisReportView({
               <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                 {t("report.pageSubtitle")}
               </div>
-              <h2 className="text-xl font-semibold tracking-tight mt-1">{t("report.pageTitle")}</h2>
+              <h2 className="font-display text-xl font-semibold tracking-tight mt-1">{t("report.pageTitle")}</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
               <MetaCell label={t("report.meta.reviewStatus")}

@@ -1,38 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
-  Sparkles,
   FileText,
-  Cpu,
   FileCheck2,
-  ShieldCheck,
-  Lock,
-  Gauge,
-  CheckCircle2,
-  CircleAlert,
-  AlertOctagon,
+  Quote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AgentConstellation } from "@/components/agent-constellation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { PRODUCT_NAME } from "@/config/instance";
+import { ProductMark } from "@/components/product-mark";
+import { LandingAgentBoard, LandingHeroOrchestra } from "@/components/landing-agent-stage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Clause — Multi-agent contract intelligence for 2M-IT" },
+      { title: `${PRODUCT_NAME} — Contract intelligence` },
       {
         name: "description",
         content:
-          "Specialist AI agents review supplier contracts against your 2M-IT template and surface risks in minutes — with clause-level evidence and a shareable report.",
+          "Specialist AI agents review a supplier pack against your reference documents and surface risks in minutes — with requirement-level evidence and a shareable report.",
       },
-      { property: "og:title", content: "Clause — Multi-agent contract intelligence" },
+      { property: "og:title", content: `${PRODUCT_NAME} — Contract intelligence` },
       {
         property: "og:description",
         content:
-          "Specialist AI agents review supplier contracts against your 2M-IT template and surface risks in minutes.",
+          "Specialist AI agents review supplier drafts against your reference pack and surface risks in minutes.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -41,207 +35,202 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const fadeUp = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
-};
-
-
-
 function Landing() {
   const { t } = useTranslation();
+  const title2 = t("landing.heroTitle2");
+
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Nav */}
-      <header className="border-b border-border/60 bg-background/75 backdrop-blur-xl sticky top-0 z-40">
-        <div className="mx-auto max-w-6xl w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0">
-            <span className="h-9 w-9 rounded-lg bg-gradient-to-br from-brand to-brand/70 text-brand-foreground grid place-items-center font-bold shadow-sm shadow-brand/30">
-              C
-            </span>
-            <span className="text-base">Clause</span>
-            <span className="hidden sm:inline text-[10px] uppercase tracking-widest text-muted-foreground border-l border-border/60 pl-2 ml-1">
-              2M-IT
-            </span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
-            <a href="#features" className="px-3 py-1.5 rounded-md hover:text-foreground hover:bg-accent/50 transition-colors">{t("landing.featuresTitle").split(" ").slice(0, 2).join(" ")}</a>
-            <a href="#agents" className="px-3 py-1.5 rounded-md hover:text-foreground hover:bg-accent/50 transition-colors">{t("nav.agents")}</a>
-            <a href="#how" className="px-3 py-1.5 rounded-md hover:text-foreground hover:bg-accent/50 transition-colors">{t("nav.howItWorks")}</a>
+    <div className="min-h-screen bg-paper text-foreground flex flex-col">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-stage">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-[4.25rem] flex items-center justify-between gap-3">
+          <ProductMark inverted />
+          <nav className="hidden lg:flex items-center gap-1 text-[13px] text-white/75">
+            {[
+              ["#stage", t("nav.product")],
+              ["#how", t("nav.howItWorks")],
+              ["#board", t("nav.agents")],
+              ["#trust", t("nav.trust")],
+            ].map(([href, label]) => (
+              <a key={href} href={href} className="px-3 py-1.5 rounded-md hover:text-white hover:bg-white/10 transition-colors">
+                {label}
+              </a>
+            ))}
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
-            <LanguageSwitcher />
-            <ThemeToggle />
-            <div className="h-6 w-px bg-border/60 mx-1 hidden sm:block" />
-            <Link to="/auth" className="hidden sm:block"><Button variant="ghost" size="sm">{t("nav.signIn")}</Button></Link>
-            <Link to="/auth">
-              <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90 shadow-sm shadow-brand/20">
-                {t("nav.startFree")} <ArrowRight size={14} className="ml-1.5" />
+            <LanguageSwitcher inverted />
+            <ThemeToggle inverted />
+            <Link to="/auth" search={{ tab: "signin" }}>
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+                {t("nav.signIn")}
+              </Button>
+            </Link>
+            <Link to="/auth" search={{ tab: "signup" }}>
+              <Button size="sm" className="bg-white text-stage hover:bg-white/90 font-semibold">
+                {t("nav.createAccount")}
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero — centered */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--brand)_16%,transparent),transparent_60%)]" />
-        <div className="mx-auto max-w-4xl px-6 pt-20 pb-10 text-center">
-          <motion.span
-            {...fadeUp}
-            className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-soft px-3 py-1 text-xs font-medium text-brand"
-          >
-            <Sparkles size={14} /> {t("landing.badge")}
-          </motion.span>
-          <motion.h1
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.05 }}
-            className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-brand leading-[1.05]"
-          >
-            {t("landing.heroTitle1")} <br className="hidden sm:block" />
-            <span className="bg-gradient-to-br from-brand to-[oklch(0.45_0.16_265)] bg-clip-text text-transparent">
-              {t("landing.heroTitleAccent")}
-            </span>{" "}
-            {t("landing.heroTitle2")}
-          </motion.h1>
-          <motion.p
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.1 }}
-            className="mt-5 mx-auto max-w-2xl text-base sm:text-lg text-muted-foreground leading-relaxed"
-          >
-            {t("landing.heroLead")}
-          </motion.p>
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.15 }}
-            className="mt-8 flex flex-wrap justify-center gap-3"
-          >
-            <Link to="/auth">
-              <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90 h-12 px-6 shadow-lg shadow-brand/25">
-                {t("landing.ctaPrimary")} <ArrowRight size={16} className="ml-2" />
-              </Button>
-            </Link>
-            <a href="#how">
-              <Button size="lg" variant="outline" className="h-12 px-6">
-                {t("landing.ctaSecondary")}
-              </Button>
-            </a>
-          </motion.div>
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.2 }}
-            className="mt-8 flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-xs text-muted-foreground"
-          >
-            <div className="flex items-center gap-2"><Lock size={14} /> {t("landing.trustPrivate")}</div>
-            <div className="flex items-center gap-2"><ShieldCheck size={14} /> {t("landing.trustGdpr")}</div>
-            <div className="flex items-center gap-2"><Gauge size={14} /> {t("landing.trustMinutes")}</div>
-          </motion.div>
-        </div>
-
-        {/* Product mock */}
-        <div className="mx-auto max-w-5xl px-6 pb-24">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="relative"
-          >
-            <div className="absolute -inset-8 -z-10 rounded-[2.5rem] bg-gradient-to-br from-brand/25 via-brand/10 to-transparent blur-3xl" />
-            <div className="rounded-2xl border border-border bg-gradient-to-br from-brand/90 to-brand p-2 shadow-2xl shadow-brand/25">
-              <ProductShot />
+      <section id="stage" className="relative overflow-hidden bg-stage text-stage-foreground scroll-mt-24">
+        <div className="landing-hero-grid absolute inset-0 pointer-events-none" />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-12 lg:py-16 grid lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] gap-10 lg:gap-12 items-center">
+          <div className="order-2 lg:order-1 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+              {t("landing.badge")}
+            </p>
+            <h1 className="mt-4 font-display text-[2.7rem] sm:text-5xl lg:text-[3.35rem] font-semibold leading-[1.08] tracking-tight text-white">
+              <span className="block">{t("landing.heroTitle1")}</span>
+              <span className="block">{t("landing.heroTitleAccent")}</span>
+              {title2 ? <span className="block">{title2}</span> : null}
+            </h1>
+            <p className="mt-4 mx-auto max-w-md text-base text-white/75 leading-snug">
+              {t("landing.heroLead")}
+            </p>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+              <Link to="/auth" search={{ tab: "signup" }}>
+                <Button size="lg" className="h-11 px-5 bg-white text-stage hover:bg-white/90 font-semibold">
+                  {t("landing.ctaPrimary")} <ArrowRight size={16} className="ml-2" />
+                </Button>
+              </Link>
+              <a href="#how">
+                <Button size="lg" variant="outline" className="h-11 px-5 border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                  {t("landing.ctaSecondary")}
+                </Button>
+              </a>
             </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* How it works — 3 steps */}
-      <section id="how" className="border-y border-border/60 bg-muted/30">
-        <div className="mx-auto max-w-5xl px-6 py-16">
-          <motion.div {...fadeUp} className="text-center max-w-xl mx-auto mb-10">
-            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-brand">
-              {t("landing.howWorksTitle")}
-            </h2>
-          </motion.div>
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              { n: 1, icon: FileText, key: "s1" },
-              { n: 2, icon: Cpu, key: "s2" },
-              { n: 3, icon: FileCheck2, key: "s3" },
-            ].map((s, i) => (
-              <motion.div
-                key={s.key}
-                {...fadeUp}
-                transition={{ ...fadeUp.transition, delay: i * 0.08 }}
-                className="rounded-xl border border-border bg-card p-6"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="h-8 w-8 rounded-full bg-brand text-brand-foreground text-sm font-semibold grid place-items-center shrink-0">
-                    {s.n}
-                  </span>
-                  <s.icon size={18} className="text-brand" />
-                </div>
-                <p className="mt-4 text-sm text-foreground/85 leading-relaxed">{t(`landing.howSteps.${s.key}`)}</p>
-              </motion.div>
-            ))}
+            <p className="mt-8 text-[12px] text-white/50 tracking-wide">
+              {t("landing.stats.agentsN")} {t("landing.stats.agents")}
+              <span className="mx-2 text-white/25">·</span>
+              {t("landing.stats.reviewN")}
+              <span className="mx-2 text-white/25">·</span>
+              {t("landing.stats.traceableN")}
+            </p>
+          </div>
+          <div className="order-1 lg:order-2">
+            <LandingHeroOrchestra t={t} />
           </div>
         </div>
       </section>
 
-      {/* Agents */}
-      <section id="agents" className="border-b border-border/60">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <motion.div {...fadeUp} className="text-center max-w-2xl mx-auto">
-            <div className="text-xs font-semibold uppercase tracking-wider text-brand">{t("landing.agentsKicker")}</div>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-semibold tracking-tight text-brand">
-              {t("landing.agentsTitle")}
-            </h2>
-            <p className="mt-4 text-muted-foreground">{t("landing.agentsLead")}</p>
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="mt-14">
-            <AgentConstellation />
-          </motion.div>
+      <section id="how" className="scroll-mt-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{t("landing.howKicker")}</p>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-foreground max-w-3xl">
+            {t("landing.howTitle")}
+          </h2>
+          <div className="mt-12 grid lg:grid-cols-3 gap-px bg-border rounded-2xl overflow-hidden border border-border">
+            <ProcessCol
+              n="01"
+              title={t("landing.steps.upload.title")}
+              copy={t("landing.steps.upload.copy")}
+              files={["Tender-invitation.pdf", "SLA-DPA.docx", "Annex.zip"]}
+            />
+            <ProcessCol
+              n="02"
+              title={t("landing.steps.orchestrate.title")}
+              copy={t("landing.steps.orchestrate.copy")}
+              pills={["SLA", "DPA", "InfoSec", "Notice", "Pricing", "Reviewer"]}
+            />
+            <ProcessCol
+              n="03"
+              title={t("landing.steps.report.title")}
+              copy={t("landing.steps.report.copy")}
+              files={["Decision-report.pdf", "Gap-brief.csv", "Evidence-pack.zip"]}
+            />
+          </div>
         </div>
       </section>
 
+      <section className="scroll-mt-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-20 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 items-center">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{t("landing.mappingKicker")}</p>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
+              {t("landing.mappingTitle")}
+            </h2>
+            <p className="mt-4 text-muted-foreground leading-relaxed">{t("landing.mappingLead")}</p>
+          </div>
+          <MappingStage t={t} />
+        </div>
+      </section>
 
-      {/* Final CTA */}
-      <section className="relative border-b border-border/60 overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklab,var(--brand)_20%,transparent),transparent_60%)]" />
-        <div className="mx-auto max-w-3xl px-6 py-20 text-center">
-          <motion.h2 {...fadeUp} className="text-3xl sm:text-4xl font-semibold tracking-tight text-brand">
+      <section id="board" className="scroll-mt-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{t("landing.operatingKicker")}</p>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-foreground max-w-3xl">
+            {t("landing.agentsTitle")}
+          </h2>
+          <p className="mt-4 max-w-2xl text-muted-foreground">{t("landing.agentsLead")}</p>
+          <div className="mt-10">
+            <LandingAgentBoard t={t} />
+          </div>
+        </div>
+      </section>
+
+      <section id="trust" className="scroll-mt-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-20 grid lg:grid-cols-2 gap-14">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{t("landing.trustKicker")}</p>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">{t("landing.trustTitle")}</h2>
+            <p className="mt-4 text-muted-foreground leading-relaxed">{t("landing.trustLead")}</p>
+          </div>
+          <ul className="space-y-2">
+            {(["p1", "p2", "p3", "p4", "p5"] as const).map((k, i) => (
+              <li key={k} className="flex gap-4 rounded-xl border border-border bg-card px-4 py-3.5">
+                <span className="font-display text-lg text-brand tabular-nums w-7 shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-sm text-foreground/85 leading-relaxed">{t(`landing.trustPoints.${k}`)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-20 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{PRODUCT_NAME}</p>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
             {t("landing.ctaFinalTitle")}
-          </motion.h2>
-          <motion.p {...fadeUp} className="mt-4 text-muted-foreground max-w-xl mx-auto">
-            {t("landing.ctaFinalLead")}
-          </motion.p>
-          <motion.div {...fadeUp} className="mt-8 flex justify-center gap-3">
-            <Link to="/auth">
-              <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90 h-12 px-6 shadow-lg shadow-brand/25">
-                {t("landing.ctaPrimary")} <ArrowRight size={16} className="ml-2" />
+          </h2>
+          <p className="mt-4 text-muted-foreground">{t("landing.ctaFinalLead")}</p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link to="/auth" search={{ tab: "signup" }}>
+              <Button size="lg" className="h-12 px-7 bg-brand text-brand-foreground hover:bg-brand/90 font-semibold">
+                {t("nav.createAccount")} <ArrowRight size={16} className="ml-2" />
               </Button>
             </Link>
-          </motion.div>
+            <Link to="/auth" search={{ tab: "signin" }}>
+              <Button size="lg" variant="outline" className="h-12 px-7 border-border text-foreground hover:bg-muted">
+                {t("nav.signIn")}
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
-      <footer className="border-t border-border/60">
-        <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-muted-foreground flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="h-6 w-6 rounded bg-brand text-brand-foreground grid place-items-center text-xs font-bold">C</span>
-            <span>© {new Date().getFullYear()} Clause · for 2M-IT</span>
+      <footer className="bg-stage text-white/70 border-t border-white/10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 grid sm:grid-cols-3 gap-10 text-sm">
+          <div>
+            <ProductMark inverted />
+            <p className="mt-4 text-xs text-white/50 max-w-xs">{t("landing.enterpriseTitle")}</p>
+            <p className="mt-3 text-xs text-white/40">© {new Date().getFullYear()} {PRODUCT_NAME}</p>
           </div>
-          <div className="flex items-center gap-5 text-xs flex-wrap justify-end">
-            <a href="#features" className="hover:text-foreground">{t("landing.featuresTitle").split(" ").slice(0, 2).join(" ")}</a>
-            <a href="#agents" className="hover:text-foreground">{t("nav.agents")}</a>
-            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link to="/terms" className="hover:text-foreground">Terms</Link>
-            <Link to="/dpa" className="hover:text-foreground">DPA</Link>
-            <Link to="/security" className="hover:text-foreground">Security</Link>
-            <Link to="/verify" className="hover:text-foreground">Verify</Link>
-            <Link to="/auth" className="hover:text-foreground">{t("nav.signIn")}</Link>
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">{t("nav.product")}</p>
+            <a href="#how" className="block hover:text-white">{t("nav.howItWorks")}</a>
+            <a href="#board" className="block hover:text-white">{t("nav.agents")}</a>
+            <a href="#trust" className="block hover:text-white">{t("nav.trust")}</a>
+            <Link to="/auth" search={{ tab: "signin" }} className="block hover:text-white">{t("nav.signIn")}</Link>
+            <Link to="/auth" search={{ tab: "signup" }} className="block hover:text-white">{t("nav.createAccount")}</Link>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white">{t("nav.trust")}</p>
+            <Link to="/privacy" className="block hover:text-white">Privacy</Link>
+            <Link to="/terms" className="block hover:text-white">Terms</Link>
+            <Link to="/dpa" className="block hover:text-white">DPA</Link>
+            <Link to="/security" className="block hover:text-white">Security</Link>
+            <Link to="/verify" className="block hover:text-white">Verify</Link>
           </div>
         </div>
       </footer>
@@ -249,111 +238,101 @@ function Landing() {
   );
 }
 
-/* ---------- Product mock shot: composed dashboard preview ---------- */
-
-function ProductShot() {
-  const { t } = useTranslation();
+function MappingStage({ t }: { t: (k: string) => string }) {
   return (
-    <div className="rounded-xl overflow-hidden bg-background border border-border/40">
-      {/* window chrome */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/40">
-        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.7_0.18_25)]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.8_0.15_85)]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.7_0.15_150)]" />
-        <div className="ml-4 flex-1 max-w-md rounded-md bg-background border border-border px-3 py-1 text-[11px] text-muted-foreground">
-          clause.app/runs/analysis-2m-it-supplier-42
-        </div>
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_24px_60px_-28px_rgba(10,36,114,0.22)]">
+      <div className="grid grid-cols-2 text-[11px] uppercase tracking-wider font-semibold bg-stage text-white">
+        <div className="px-4 py-2.5 border-r border-white/10">{t("landing.sampleTender")}</div>
+        <div className="px-4 py-2.5">{t("landing.sampleBidder")}</div>
       </div>
+      <div className="grid grid-cols-2">
+        <QuoteCell
+          side="req"
+          title="Art. 28 processor duties"
+          quote="Processor shall not engage another processor without prior written authorisation of the controller."
+        />
+        <QuoteCell
+          side="bid"
+          title="Sub-processors"
+          quote="Provider may appoint sub-processors and will notify Customer of material changes where reasonably practicable."
+          gap
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border bg-muted/40">
+        <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-border max-w-xs">
+          <div className="bg-critical w-[22%]" />
+          <div className="bg-warning w-[28%]" />
+          <div className="bg-ok w-[50%]" />
+        </div>
+        <span className="text-xs text-muted-foreground">Coverage 72 · 3 critical</span>
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-[180px_1fr] min-h-[420px]">
-        {/* sidebar */}
-        <div className="border-r border-border bg-brand text-brand-foreground p-3 hidden sm:block">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-brand-foreground/60 mb-2 px-2">Workspace</div>
-          {[
-            { label: "Dashboard", active: false },
-            { label: "Analyses", active: true },
-            { label: "Criteria Library", active: false },
-            { label: "Agents", active: false },
-            { label: "Audit Log", active: false },
-            { label: "Settings", active: false },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className={`px-2 py-1.5 rounded text-[11px] mb-0.5 ${
-                item.active ? "bg-brand-foreground/15 text-brand-foreground" : "text-brand-foreground/70"
-              }`}
-            >
-              {item.label}
-            </div>
+function QuoteCell({
+  title,
+  quote,
+  gap,
+}: {
+  side: "req" | "bid";
+  title: string;
+  quote: string;
+  gap?: boolean;
+}) {
+  return (
+    <div className={`p-4 ${gap ? "bg-critical/5" : "bg-card"} border-t border-border first:border-r`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-foreground">{title}</p>
+        {gap ? <span className="text-[10px] font-medium text-critical">Gap</span> : null}
+      </div>
+      <p className="mt-2 font-sans text-[13px] leading-relaxed text-muted-foreground italic">
+        <Quote size={12} className="inline mr-1 opacity-40" />
+        {quote}
+      </p>
+    </div>
+  );
+}
+
+function ProcessCol({
+  n,
+  title,
+  copy,
+  files,
+  pills,
+}: {
+  n: string;
+  title: string;
+  copy: string;
+  files?: string[];
+  pills?: string[];
+}) {
+  return (
+    <article className="bg-card p-7 min-h-[280px]">
+      <div className="flex items-baseline justify-between">
+        <span className="font-display text-3xl text-brand">{n}</span>
+        <FileCheck2 size={18} className="text-brand" />
+      </div>
+      <h3 className="mt-6 text-lg font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{copy}</p>
+      {files && (
+        <ul className="mt-5 space-y-1.5">
+          {files.map((f) => (
+            <li key={f} className="flex items-center gap-2 text-xs text-foreground bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
+              <FileText size={12} /> {f}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pills && (
+        <div className="mt-5 flex flex-wrap gap-1.5">
+          {pills.map((p) => (
+            <span key={p} className="text-[11px] rounded-full bg-stage text-white px-2.5 py-1">
+              {p}
+            </span>
           ))}
         </div>
-
-        {/* main */}
-        <div className="p-5 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Analysis #42</div>
-              <div className="font-semibold text-base mt-0.5">CloudNordic — Managed Services Agreement</div>
-            </div>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-[oklch(0.7_0.15_150)]/15 text-[oklch(0.45_0.15_150)] font-medium">
-              Completed · 2m 14s
-            </span>
-          </div>
-
-          {/* KPI row */}
-          <div className="grid grid-cols-3 gap-2">
-            <KpiCard label={t("report.complianceScore")} value="72" tone="brand" />
-            <KpiCard label={t("report.riskExposure")} value="Medium" tone="warn" />
-            <KpiCard label={t("report.critical")} value="3" tone="crit" />
-          </div>
-
-          {/* findings */}
-          <div className="rounded-lg border border-border bg-card">
-            <div className="px-3 py-2 border-b border-border text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Top findings
-            </div>
-            <div className="divide-y divide-border">
-              <FindingRow sev="crit" agent="DPA" text="No signed Data Processing Agreement referenced." />
-              <FindingRow sev="crit" agent="SLA" text="Uptime SLA 99.0% below 2M-IT baseline (99.9%)." />
-              <FindingRow sev="warn" agent="Pricing" text="Annual CPI escalation uncapped." />
-              <FindingRow sev="warn" agent="Notice" text="Auto-renewal with 12-month notice period." />
-              <FindingRow sev="ok"   agent="InfoSec" text="ISO/IEC 27001 certification confirmed." />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KpiCard({ label, value, tone }: { label: string; value: string; tone: "brand" | "warn" | "crit" }) {
-  const bg =
-    tone === "brand" ? "bg-brand-soft text-brand" :
-    tone === "warn"  ? "bg-[oklch(0.8_0.15_85)]/15 text-[oklch(0.5_0.15_60)]" :
-                       "bg-[oklch(0.7_0.18_25)]/15 text-[oklch(0.5_0.18_25)]";
-  return (
-    <div className={`rounded-lg px-3 py-2.5 ${bg}`}>
-      <div className="text-[9px] uppercase tracking-widest opacity-80">{label}</div>
-      <div className="text-lg font-semibold mt-0.5">{value}</div>
-    </div>
-  );
-}
-
-function FindingRow({ sev, agent, text }: { sev: "crit" | "warn" | "ok"; agent: string; text: string }) {
-  const Icon = sev === "crit" ? AlertOctagon : sev === "warn" ? CircleAlert : CheckCircle2;
-  const color =
-    sev === "crit" ? "text-[oklch(0.55_0.18_25)]" :
-    sev === "warn" ? "text-[oklch(0.55_0.15_60)]" :
-                     "text-[oklch(0.5_0.15_150)]";
-  return (
-    <div className="flex items-start gap-3 px-3 py-2.5">
-      <Icon size={16} className={`${color} shrink-0 mt-0.5`} />
-      <div className="flex-1 min-w-0">
-        <div className="text-[12px] leading-snug text-foreground/90">{text}</div>
-      </div>
-      <span className="text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/50 text-muted-foreground shrink-0">
-        {agent}
-      </span>
-    </div>
+      )}
+    </article>
   );
 }

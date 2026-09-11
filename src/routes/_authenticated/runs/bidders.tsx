@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/runs/bidders")({
   validateSearch: (search: Record<string, unknown>): Search => ({
     runs: typeof search.runs === "string" ? search.runs : undefined,
   }),
-  head: () => ({ meta: [{ title: "Multi-bidder matrix — Clause" }] }),
+  head: () => ({ meta: [{ title: "Multi-bidder matrix — Counterpart" }] }),
   component: MultiBidderPage,
 });
 

@@ -14,6 +14,7 @@ CREATE TABLE public.users (
   full_name TEXT,
   avatar_url TEXT,
   email_verified_at TIMESTAMPTZ,
+  deactivated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -27,6 +28,29 @@ CREATE TABLE public.sessions (
 );
 CREATE INDEX sessions_user_id_idx ON public.sessions(user_id);
 CREATE INDEX sessions_expires_at_idx ON public.sessions(expires_at);
+
+CREATE TABLE public.auth_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  email TEXT,
+  purpose TEXT NOT NULL CHECK (purpose IN ('reset', 'verify')),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX auth_tokens_user_idx ON public.auth_tokens(user_id);
+
+CREATE TABLE public.auth_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  email TEXT,
+  event TEXT NOT NULL,
+  ip TEXT,
+  meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX auth_events_created_idx ON public.auth_events(created_at DESC);
 
 CREATE TABLE public.organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,6 +110,7 @@ CREATE TABLE public.profiles (
   avatar_url TEXT,
   current_workspace_id UUID REFERENCES public.workspaces(id) ON DELETE SET NULL,
   current_organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+  onboarding_json JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

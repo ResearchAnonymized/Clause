@@ -35,6 +35,11 @@ describe("translation coverage", () => {
     describe(name, () => {
       const localeKeys = collectKeys(dict as unknown as AnyObj);
 
+      it(`has every English key`, () => {
+        const missing = enKeys.filter((k) => !localeKeys.includes(k));
+        expect(missing).toEqual([]);
+      });
+
       it(`has no extra keys not present in en`, () => {
         const extra = localeKeys.filter((k) => !enKeys.includes(k));
         expect(extra).toEqual([]);
@@ -45,7 +50,9 @@ describe("translation coverage", () => {
         for (const key of localeKeys) {
           const v = getAt(dict as unknown as AnyObj, key);
           if (typeof v === "string") {
-            if (v.trim() === "") empties.push(key);
+            // Optional copy (e.g. landing.heroTitle2) may be blank in English too.
+            const enVal = getAt(en as unknown as AnyObj, key);
+            if (v.trim() === "" && !(typeof enVal === "string" && enVal.trim() === "")) empties.push(key);
             continue;
           }
           if (Array.isArray(v)) {

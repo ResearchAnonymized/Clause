@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { createStorageBucket } from "@/db/storage";
+import { getSql } from "@/db/pool";
 
 /**
  * Stream a stored object as binary (not base64 JSON).
@@ -30,8 +31,7 @@ export const Route = createFileRoute("/api/storage/file")({
           });
         }
 
-        // Only allow the signed-in user to read their own objects (path prefix).
-        if (!objectPath.startsWith(`${session.user.id}/`)) {
+        if (!(await canReadStoredObject(session.user.id, objectPath))) {
           return new Response(JSON.stringify({ error: "Forbidden" }), {
             status: 403,
             headers: { "Content-Type": "application/json" },
@@ -66,6 +66,30 @@ export const Route = createFileRoute("/api/storage/file")({
     },
   },
 });
+
+/** Own uploads, or any file attached to a run/pack in a workspace the user belongs to. */
+async function canReadStoredObject(userId: string, objectPath: string) {
+  if (objectPath.startsWith(`${userId}/`)) return true;
+  const sql = getSql();
+  const docs = await sql`
+    SELECT 1
+    FROM run_documents d
+    JOIN workspace_members wm
+      ON wm.workspace_id = d.workspace_id AND wm.user_id = ${userId}
+    WHERE d.storage_path = ${objectPath}
+    LIMIT 1
+  `;
+  if (docs.length) return true;
+  const packs = await sql`
+    SELECT 1
+    FROM run_packs p
+    JOIN workspace_members wm
+      ON wm.workspace_id = p.workspace_id AND wm.user_id = ${userId}
+    WHERE p.storage_path = ${objectPath}
+    LIMIT 1
+  `;
+  return packs.length > 0;
+}
 
 function guessMime(name: string) {
   const lower = name.toLowerCase();

@@ -16,11 +16,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Copy, Plus, Trash2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { OPENROUTER_MODELS } from "@/lib/agent-defaults";
+import { OPENROUTER_MODELS, formatModelLabel } from "@/lib/agent-defaults";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/criteria")({
-  head: () => ({ meta: [{ title: "Criteria library — Clause" }] }),
+  head: () => ({ meta: [{ title: "Criteria library — Counterpart" }] }),
   component: CriteriaPage,
 });
 
@@ -76,7 +76,7 @@ function CriteriaPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour-stage="criteria">
         <PageBack label="Back" fallback={{ to: "/runs" }} />
         <PageBreadcrumbs items={[{ label: "Analyses", to: "/runs" }, { label: "Criteria library" }]} />
         <h1 className="text-2xl font-semibold tracking-tight">Criteria library</h1>
@@ -290,8 +290,12 @@ function CriterionRow({
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                {!MODELS.includes(model) && <SelectItem value={model}>{model}</SelectItem>}
+                {MODELS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {formatModelLabel(m)}
+                  </SelectItem>
+                ))}
+                {!MODELS.includes(model) && <SelectItem value={model}>{formatModelLabel(model)}</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -323,7 +327,7 @@ function NewCriterionDialog({ setId, workspaceId, nextSort, onSaved }: { setId: 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("SLA");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("openai/gpt-4o-mini");
+  const [model, setModel] = useState(OPENROUTER_MODELS[0]);
   const [severity, setSeverity] = useState("warning");
   const [busy, setBusy] = useState(false);
 
@@ -376,7 +380,11 @@ function NewCriterionDialog({ setId, workspaceId, nextSort, onSaved }: { setId: 
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                {MODELS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {formatModelLabel(m)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

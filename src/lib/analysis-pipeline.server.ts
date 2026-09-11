@@ -2,9 +2,9 @@ import { analyseCriterion } from "@/lib/analysis-agents.server";
 import { ingestRunDocuments } from "@/lib/rag-ingest.server";
 import { retrieveForCriterion, checkGrounded } from "@/lib/rag-retrieve.server";
 import { ANALYZER_VERSION, CHUNKER_VERSION, EXTRACTOR_VERSION } from "@/lib/pipeline-version";
-import { resolveAnalysisModel } from "@/lib/ai-gateway.server";
+import { resolveAnalysisModel, withCostTier } from "@/lib/ai-gateway.server";
 import {
-  DEFAULT_LLM_CONFIG,
+  mergeLlmConfig,
   type AgentPromptsConfig,
   type LlmConfig,
 } from "@/lib/agent-defaults";
@@ -97,23 +97,27 @@ export async function runAnalysisPipeline(
     .eq("id", workspace_id)
     .maybeSingle();
 
-  const llmConfig = {
-    ...DEFAULT_LLM_CONFIG,
-    ...(((workspace?.llm_config as unknown) as LlmConfig) ?? {}),
-  };
+  const llmConfig = mergeLlmConfig((workspace?.llm_config as unknown as LlmConfig) ?? null);
   const agentPrompts = ((workspace?.agent_prompts as unknown) as AgentPromptsConfig) ?? null;
-  const workspaceModel = llmConfig.model || process.env.AI_DEFAULT_MODEL || DEFAULT_LLM_CONFIG.model;
+  const workspaceModel = llmConfig.model || process.env.AI_DEFAULT_MODEL || llmConfig.model;
   const dag = pipelineFromLlmExtra((llmConfig.extra as Record<string, unknown>) ?? {});
+
+  return withCostTier(llmConfig.extra?.cost_tier, async () => {
+
+  const { data: packDocs } = await supabase
+    .from("run_documents")
+    .select("filename, role, doc_kind")
+    .eq("run_id", runId);
+  const customerDocs = (packDocs ?? []).filter((d: any) => d.role === "customer");
+  const supplierDocs = (packDocs ?? []).filter((d: any) => d.role === "supplier");
+  const packContext = {
+    bidderFiles: supplierDocs.map((d: any) => String(d.filename || "")).filter(Boolean),
+    tenderFiles: customerDocs.map((d: any) => String(d.filename || "")).filter(Boolean),
+  };
 
   // ——— Compliance (deterministic pack checks) ———
   let compliance: ReturnType<typeof runComplianceValidation> = [];
   if (isStageEnabled(dag, "compliance")) {
-  const { data: docs } = await supabase
-    .from("run_documents")
-    .select("filename, role, doc_kind")
-    .eq("run_id", runId);
-  const customerDocs = (docs ?? []).filter((d: any) => d.role === "customer");
-  const supplierDocs = (docs ?? []).filter((d: any) => d.role === "supplier");
   compliance = runComplianceValidation({ customerDocs, supplierDocs });
   await supabase.from("agent_events").insert({
     run_id: runId,
@@ -315,6 +319,7 @@ export async function runAnalysisPipeline(
         model,
         systemPrompt: agentPrompts?.system,
         mappedPairsHint: mappedHint,
+        packContext,
       });
 
       const check = checkGrounded(finding.evidence_quote, finding.evidence_chunk_id, sup);
@@ -448,6 +453,7 @@ export async function runAnalysisPipeline(
         justification: f.justification,
       })),
       pairs,
+      packContext,
     });
 
     for (const g of gaps) {
@@ -748,5 +754,6 @@ export async function runAnalysisPipeline(
   }
 
   return { ok: true, critical, warning, okCount: ok, grounded: groundedCount, pairs: pairs.length };
+  });
   });
 }

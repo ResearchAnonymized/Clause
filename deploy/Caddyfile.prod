@@ -1,0 +1,5 @@
+# Used by docker-compose.prod.yml. APP_HOST is the public hostname (no scheme).
+{$APP_HOST} {
+	encode gzip
+	reverse_proxy app:3000
+}
