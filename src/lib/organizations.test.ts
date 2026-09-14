@@ -2,7 +2,9 @@
 import { describe, expect, it } from "vitest";
 import {
   canManageOrganization,
+  canMutateRun,
   inviteExpiresAt,
+  inviteRoleMapping,
   looksLikeInviteToken,
   parseInviteInput,
   slugifyOrgName,
@@ -20,6 +22,20 @@ describe("organizations helpers", () => {
     expect(canManageOrganization("owner")).toBe(true);
     expect(canManageOrganization("admin")).toBe(true);
     expect(canManageOrganization("member")).toBe(false);
+  });
+
+  it("lets reviewers mutate runs and blocks viewers", () => {
+    expect(canMutateRun("owner")).toBe(true);
+    expect(canMutateRun("admin")).toBe(true);
+    expect(canMutateRun("reviewer")).toBe(true);
+    expect(canMutateRun("viewer")).toBe(false);
+    expect(canMutateRun(null)).toBe(false);
+  });
+
+  it("maps invite people roles without granting owner", () => {
+    expect(inviteRoleMapping("admin")).toEqual({ orgRole: "admin", workspaceRole: "admin" });
+    expect(inviteRoleMapping("reviewer")).toEqual({ orgRole: "member", workspaceRole: "reviewer" });
+    expect(inviteRoleMapping("viewer")).toEqual({ orgRole: "member", workspaceRole: "viewer" });
   });
 
   it("parses invite links and rejects names", () => {

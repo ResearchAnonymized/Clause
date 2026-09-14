@@ -5,11 +5,14 @@ import { closeSql, getSql, sqlHealthcheck } from "@/db/pool";
 import { hashPassword } from "@/lib/auth/session";
 import {
   acceptOrganizationInvite,
+  assertCanMutateWorkspaceWork,
   assertOrgMembership,
   assertWorkspaceInUserOrg,
   createOrganizationInvite,
+  provisionOrganizationForOwnerInvite,
   provisionOrganizationForUser,
 } from "@/lib/organizations.server";
+import { VIEWER_MUTATION_DENIED } from "@/lib/organizations";
 import { loadLocalEnv } from "@/test/env";
 
 loadLocalEnv();
@@ -27,6 +30,8 @@ function assertLocalDatabase() {
 const stamp = `${Date.now()}-${randomBytes(4).toString("hex")}`;
 const emailA = `counterpart.test.a.${stamp}@example.test`;
 const emailB = `counterpart.test.b.${stamp}@example.test`;
+const emailC = `counterpart.test.c.${stamp}@example.test`;
+const emailD = `counterpart.test.d.${stamp}@example.test`;
 
 let dbOk = false;
 let userA = "";
@@ -35,6 +40,8 @@ let orgA = "";
 let workspaceA = "";
 let orgB = "";
 let workspaceB = "";
+let userC = "";
+let userD = "";
 
 async function insertUser(email: string, name: string) {
   const sql = getSql();
@@ -62,6 +69,8 @@ describe("postgres tenant isolation", () => {
 
     userA = await insertUser(emailA, "Test Owner A");
     userB = await insertUser(emailB, "Test Member B");
+    userC = await insertUser(emailC, "Test Reviewer C");
+    userD = await insertUser(emailD, "Test Owner D");
     const a = await provisionOrganizationForUser({
       userId: userA,
       orgName: `Vitest Org A ${stamp}`,
@@ -81,7 +90,7 @@ describe("postgres tenant isolation", () => {
   afterAll(async () => {
     if (dbOk) {
       const sql = getSql();
-      await sql`DELETE FROM users WHERE email = ANY(${[emailA, emailB]})`;
+      await sql`DELETE FROM users WHERE email = ANY(${[emailA, emailB, emailC, emailD]})`;
     }
     await closeSql();
   });
@@ -130,5 +139,97 @@ describe("postgres tenant isolation", () => {
     await expect(
       acceptOrganizationInvite({ token: invite.token, userId: userA, userEmail: emailA }),
     ).rejects.toThrow(/invited email/i);
+  });
+
+  it("invites a person only into the named workspace", async () => {
+    const sql = getSql();
+    const { uniqueSlug } = await import("@/lib/organizations");
+    const ws = await sql`
+      INSERT INTO workspaces (name, slug, owner_id, organization_id)
+      VALUES (
+        ${`Matter ${stamp}`},
+        ${uniqueSlug("matter", orgA)},
+        ${userA},
+        ${orgA}
+      )
+      RETURNING id
+    `;
+    const matterId = ws[0].id as string;
+    await sql`
+      INSERT INTO workspace_members (workspace_id, user_id, role)
+      VALUES (${matterId}, ${userA}, 'owner'::workspace_role)
+      ON CONFLICT DO NOTHING
+    `;
+
+    const invite = await createOrganizationInvite({
+      organizationId: orgA,
+      email: emailC,
+      role: "member",
+      invitedBy: userA,
+      workspaceIds: [matterId],
+      workspaceRole: "reviewer",
+    });
+    const accepted = await acceptOrganizationInvite({
+      token: invite.token,
+      userId: userC,
+      userEmail: emailC,
+    });
+    expect(accepted.workspaceId).toBe(matterId);
+    await expect(assertWorkspaceInUserOrg(userC, matterId)).resolves.toMatchObject({
+      organizationId: orgA,
+    });
+    await expect(assertWorkspaceInUserOrg(userC, workspaceA)).rejects.toThrow(/not accessible/i);
+  });
+
+  it("blocks viewers from mutating workspace work", async () => {
+    const sql = getSql();
+    await sql`
+      INSERT INTO workspace_members (workspace_id, user_id, role)
+      VALUES (${workspaceB}, ${userC}, 'viewer'::workspace_role)
+      ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = 'viewer'::workspace_role
+    `;
+    await expect(assertCanMutateWorkspaceWork(userC, workspaceB)).rejects.toThrow(
+      VIEWER_MUTATION_DENIED,
+    );
+    await expect(assertCanMutateWorkspaceWork(userB, workspaceB)).resolves.toMatchObject({
+      role: "owner",
+    });
+  });
+
+  it("lets GPT-Lab provision an org without joining it", async () => {
+    const provisioned = await provisionOrganizationForOwnerInvite({
+      name: `Customer ${stamp}`,
+      ownerEmail: emailD,
+      createdBy: userA,
+      workspaceName: "General",
+    });
+    await expect(assertOrgMembership(userA, provisioned.organizationId)).rejects.toThrow(
+      /not an organization member/i,
+    );
+    const accepted = await acceptOrganizationInvite({
+      token: provisioned.token,
+      userId: userD,
+      userEmail: emailD,
+    });
+    expect(accepted.organizationId).toBe(provisioned.organizationId);
+    await expect(
+      assertOrgMembership(userD, provisioned.organizationId, ["owner"]),
+    ).resolves.toMatchObject({ role: "owner" });
+  });
+
+  it("reissues a copyable owner join link", async () => {
+    const provisioned = await provisionOrganizationForOwnerInvite({
+      name: `Reissue ${stamp}`,
+      ownerEmail: emailD,
+      createdBy: userA,
+    });
+    const { reissueOwnerInvite } = await import("@/lib/organizations.server");
+    const again = await reissueOwnerInvite({
+      organizationId: provisioned.organizationId,
+      actorUserId: userA,
+    });
+    expect(again.acceptUrl).toContain("/invite/accept?token=");
+    expect(again.email.toLowerCase()).toBe(emailD);
+    expect(again.acceptUrl).not.toContain(provisioned.token);
   });
 });

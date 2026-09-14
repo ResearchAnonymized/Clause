@@ -51,7 +51,12 @@ export const Route = createFileRoute("/api/mapping-pair-override")({
           return Response.json({ data: { ok: true }, error: null });
         } catch (err: any) {
           const msg = String(err?.message ?? err);
-          const code = msg === "Forbidden" ? 403 : msg.includes("reason") ? 400 : 500;
+          const code =
+            msg === "Forbidden" || msg.includes("cannot change")
+              ? 403
+              : msg.includes("reason")
+                ? 400
+                : 500;
           return Response.json({ error: { message: msg.slice(0, 240) } }, { status: code });
         }
       },

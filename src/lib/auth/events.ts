@@ -10,7 +10,10 @@ export type AuthEventName =
   | "password_reset_request"
   | "password_reset"
   | "role_change"
-  | "session_revoke";
+  | "session_revoke"
+  | "access_requested"
+  | "access_approved"
+  | "access_rejected";
 
 export async function recordAuthEvent(opts: {
   event: AuthEventName;

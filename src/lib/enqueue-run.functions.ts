@@ -22,6 +22,8 @@ export const enqueueRun = createServerFn({ method: "POST" })
     if (error || !run) {
       throw new Error("Run not found");
     }
+    const { assertCanMutateRun } = await import("@/lib/organizations.server");
+    await assertCanMutateRun(context.userId, data.runId);
 
     const aiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     if (!aiKey) {

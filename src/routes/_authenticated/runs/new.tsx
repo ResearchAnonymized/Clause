@@ -5,6 +5,7 @@ import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentWorkspace } from "@/hooks/use-workspace";
+import { canMutateRun, VIEWER_MUTATION_DENIED } from "@/lib/organizations";
 import { enqueueRun } from "@/lib/enqueue-run.functions";
 import { expandUploads, type ExpandedUpload } from "@/lib/expand-uploads";
 import { PackPreview } from "@/components/pack/pack-preview";
@@ -43,7 +44,8 @@ type Mode = "single" | "tender" | "bulk";
 function NewRunPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { workspaceId } = useCurrentWorkspace();
+  const { workspaceId, role } = useCurrentWorkspace();
+  const canStart = canMutateRun(role);
   const { mark: markOnboarding, showCoach } = useOnboarding();
   const [mode, setMode] = useState<Mode>("tender");
   const [title, setTitle] = useState("");
@@ -428,7 +430,8 @@ function NewRunPage() {
           </Button>
           <Button
             type="button"
-            disabled={busy || !criteriaSetId || !workspaceId}
+            disabled={busy || !criteriaSetId || !workspaceId || !canStart}
+            title={!canStart ? VIEWER_MUTATION_DENIED : undefined}
             className={cn(coachPhase === "start" && "ring-2 ring-brand ring-offset-2")}
             onClick={() => void submit()}
           >

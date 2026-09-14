@@ -17,22 +17,24 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Building2, Copy, Trash2, UserPlus } from "lucide-react";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
-import { canManageOrganization } from "@/lib/organizations";
+import { useTranslation } from "react-i18next";
+import { canManageOrganization, type PeopleInviteRole } from "@/lib/organizations";
 
 export const Route = createFileRoute("/_authenticated/settings/organization")({
-  head: () => ({ meta: [{ title: "Organization — Counterpart" }] }),
+  head: () => ({ meta: [{ title: "People & organization — Counterpart" }] }),
   component: OrganizationSettingsPage,
 });
 
 function OrganizationSettingsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
-  const { organizationId, organization, organizationRole } = useCurrentWorkspace();
+  const { organizationId, organization, organizationRole, workspaceId } = useCurrentWorkspace();
   const canManage = canManageOrganization(organizationRole);
   const [name, setName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
+  const [inviteRole, setInviteRole] = useState<PeopleInviteRole>("reviewer");
+  const [inviteWorkspaceIds, setInviteWorkspaceIds] = useState<string[]>([]);
   const [newWsName, setNewWsName] = useState("");
-  const [newOrgName, setNewOrgName] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
 
@@ -53,6 +55,33 @@ function OrganizationSettingsPage() {
       return listOrganizationInvites({ data: { organizationId: organizationId! } });
     },
   });
+
+  const { data: orgWorkspaces = [] } = useQuery({
+    queryKey: ["org-workspaces", organizationId],
+    enabled: !!organizationId,
+    queryFn: async () => {
+      const { listOrganizationWorkspaces } = await import("@/lib/organizations.functions");
+      return listOrganizationWorkspaces({ data: { organizationId: organizationId! } });
+    },
+  });
+
+  const { data: audit = [] } = useQuery({
+    queryKey: ["org-audit", organizationId],
+    enabled: !!organizationId && canManage,
+    queryFn: async () => {
+      const { listOrganizationAudit } = await import("@/lib/organizations.functions");
+      return listOrganizationAudit({ data: { organizationId: organizationId! } });
+    },
+  });
+
+  const selectedWorkspaces =
+    inviteWorkspaceIds.length > 0
+      ? inviteWorkspaceIds
+      : workspaceId
+        ? [workspaceId]
+        : orgWorkspaces[0]
+          ? [orgWorkspaces[0].id]
+          : [];
 
   const ownerCount = useMemo(
     () => members.filter((m) => m.role === "owner").length,
@@ -77,6 +106,10 @@ function OrganizationSettingsPage() {
 
   const invite = async () => {
     if (!organizationId || !inviteEmail.trim()) return;
+    if (!selectedWorkspaces.length) {
+      toast.error(t("peoplePage.workspaces"));
+      return;
+    }
     setBusy(true);
     try {
       const { inviteToOrganization } = await import("@/lib/organizations.functions");
@@ -85,12 +118,14 @@ function OrganizationSettingsPage() {
           organizationId,
           email: inviteEmail.trim(),
           role: inviteRole,
+          workspaceIds: selectedWorkspaces,
         },
       });
       setLastInviteUrl(result.acceptUrl);
-      toast.success("Invite created — the link is below (and in the server log if email is not configured)");
+      toast.success(result.emailed ? t("peoplePage.inviteCreatedEmailed") : t("peoplePage.inviteCreated"));
       setInviteEmail("");
       qc.invalidateQueries({ queryKey: ["org-invites", organizationId] });
+      qc.invalidateQueries({ queryKey: ["org-audit", organizationId] });
     } catch (e: any) {
       toast.error(e.message ?? "Invite failed");
     } finally {
@@ -101,7 +136,7 @@ function OrganizationSettingsPage() {
   const copyInvite = async () => {
     if (!lastInviteUrl) return;
     await navigator.clipboard.writeText(lastInviteUrl);
-    toast.success("Invite link copied");
+    toast.success(t("peoplePage.copyLink"));
   };
 
   const revoke = async (inviteId: string) => {
@@ -130,13 +165,14 @@ function OrganizationSettingsPage() {
 
   const remove = async (userId: string) => {
     if (!organizationId) return;
-    if (!confirm("Remove this member from the organization?")) return;
+    if (!confirm(t("peoplePage.remove"))) return;
     try {
       const { removeOrganizationMember } = await import("@/lib/organizations.functions");
       await removeOrganizationMember({ data: { organizationId, userId } });
       toast.success("Member removed");
       qc.invalidateQueries({ queryKey: ["org-members", organizationId] });
       qc.invalidateQueries({ queryKey: ["workspaces"] });
+      qc.invalidateQueries({ queryKey: ["org-audit", organizationId] });
     } catch (e: any) {
       toast.error(e.message ?? "Remove failed");
     }
@@ -150,29 +186,13 @@ function OrganizationSettingsPage() {
       await createWorkspaceInOrganization({
         data: { organizationId, name: newWsName.trim() },
       });
-      toast.success("Workspace created");
+      toast.success(t("peoplePage.createWorkspace"));
       setNewWsName("");
       qc.invalidateQueries({ queryKey: ["workspaces"] });
+      qc.invalidateQueries({ queryKey: ["org-workspaces", organizationId] });
+      qc.invalidateQueries({ queryKey: ["org-audit", organizationId] });
     } catch (e: any) {
       toast.error(e.message ?? "Could not create workspace");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const createOrg = async () => {
-    if (!newOrgName.trim()) return;
-    setBusy(true);
-    try {
-      const { createOrganization } = await import("@/lib/organizations.functions");
-      await createOrganization({
-        data: { name: newOrgName.trim(), kind: "company" },
-      });
-      toast.success("Organization created");
-      setNewOrgName("");
-      qc.invalidateQueries();
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not create organization");
     } finally {
       setBusy(false);
     }
@@ -187,20 +207,22 @@ function OrganizationSettingsPage() {
       <div className="space-y-2">
         <PageBack label="Back to settings" fallback={{ to: "/settings" }} />
         <PageBreadcrumbs
-          items={[{ label: "Settings", to: "/settings" }, { label: "Organization" }]}
+          items={[{ label: "Settings", to: "/settings" }, { label: t("peoplePage.title") }]}
         />
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Building2 className="h-6 w-6" /> Organization
+          <Building2 className="h-6 w-6" /> {t("peoplePage.title")}
         </h1>
         <p className="text-sm text-muted-foreground">
           <span className="font-medium">{organization.name}</span>
           {" · "}
-          <Badge variant="outline" className="align-middle">
-            {organization.kind}
-          </Badge>
-          {" · your org role: "}
-          {organizationRole === "admin" ? "org admin" : organizationRole}
+          {t("peoplePage.yourRole")}:{" "}
+          {organizationRole === "owner"
+            ? t("peoplePage.owner")
+            : organizationRole === "admin"
+              ? t("peoplePage.admin")
+              : t("peoplePage.member")}
         </p>
+        <p className="text-sm text-muted-foreground">{t("peoplePage.lead")}</p>
       </div>
 
       <Card>
@@ -233,47 +255,74 @@ function OrganizationSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5" /> Invite people
+            <UserPlus className="h-5 w-5" /> {t("peoplePage.inviteTitle")}
           </CardTitle>
-          <CardDescription>
-            Invite by email. Share the link (copy-link). They must sign in with that email to accept.
-          </CardDescription>
+          <CardDescription>{t("peoplePage.inviteLead")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {canManage ? (
             <>
               <div className="flex flex-wrap gap-2 items-end">
                 <div className="space-y-1 flex-1 min-w-[200px]">
-                  <Label>Email</Label>
+                  <Label>{t("peoplePage.email")}</Label>
                   <Input
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="colleague@company.com"
+                    placeholder="colleague@firm.fi"
                   />
                 </div>
-                <div className="space-y-1 w-36">
-                  <Label>Role</Label>
+                <div className="space-y-1 w-44">
+                  <Label>{t("peoplePage.role")}</Label>
                   <Select
                     value={inviteRole}
-                    onValueChange={(v) => setInviteRole(v as "admin" | "member")}
+                    onValueChange={(v) => setInviteRole(v as PeopleInviteRole)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="admin">Org admin</SelectItem>
+                      <SelectItem value="reviewer">{t("peoplePage.roleReviewer")}</SelectItem>
+                      <SelectItem value="viewer">{t("peoplePage.roleViewer")}</SelectItem>
+                      <SelectItem value="admin">{t("peoplePage.roleAdmin")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={invite} disabled={busy || !inviteEmail.trim()}>
-                  Create invite
+                <Button onClick={() => void invite()} disabled={busy || !inviteEmail.trim()}>
+                  {t("peoplePage.createInvite")}
                 </Button>
               </div>
+              {orgWorkspaces.length > 0 && (
+                <div className="space-y-2">
+                  <Label>{t("peoplePage.workspaces")}</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {orgWorkspaces.map((ws) => {
+                      const checked = selectedWorkspaces.includes(ws.id);
+                      return (
+                        <Button
+                          key={ws.id}
+                          type="button"
+                          size="sm"
+                          variant={checked ? "default" : "outline"}
+                          onClick={() => {
+                            setInviteWorkspaceIds((prev) => {
+                              const base = prev.length ? prev : selectedWorkspaces;
+                              return checked
+                                ? base.filter((id) => id !== ws.id)
+                                : [...base, ws.id];
+                            });
+                          }}
+                        >
+                          {ws.name}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {lastInviteUrl && (
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                  <p className="text-xs text-muted-foreground">Invite link (expires in 14 days)</p>
+                  <p className="text-xs text-muted-foreground">{t("adminPage.inviteLink")}</p>
                   <div className="flex gap-2">
                     <Input readOnly value={lastInviteUrl} className="font-mono text-xs" />
                     <Button type="button" variant="outline" onClick={copyInvite}>
@@ -284,7 +333,7 @@ function OrganizationSettingsPage() {
               )}
               {invites.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Pending invites</p>
+                  <p className="text-sm font-medium">{t("peoplePage.pending")}</p>
                   {invites.map((inv) => (
                     <div
                       key={inv.id}
@@ -293,11 +342,11 @@ function OrganizationSettingsPage() {
                       <div>
                         <div>{inv.email}</div>
                         <div className="text-xs text-muted-foreground">
-                          {inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                          {inv.role} · {t("peoplePage.expires")} {new Date(inv.expires_at).toLocaleDateString()}
                         </div>
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => revoke(inv.id)}>
-                        Revoke
+                        {t("peoplePage.revoke")}
                       </Button>
                     </div>
                   ))}
@@ -305,18 +354,15 @@ function OrganizationSettingsPage() {
               )}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">Only org owners and admins can invite.</p>
+            <p className="text-sm text-muted-foreground">{t("peoplePage.onlyManagers")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Members</CardTitle>
-          <CardDescription>
-            Organization roles control who can invite and manage workspaces. Workspace roles still
-            control analysis permissions.
-          </CardDescription>
+          <CardTitle>{t("peoplePage.membersTitle")}</CardTitle>
+          <CardDescription>{t("peoplePage.membersLead")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {members.map((m) => (
@@ -327,6 +373,11 @@ function OrganizationSettingsPage() {
               <div className="min-w-0">
                 <div className="font-medium truncate">{m.display_name}</div>
                 <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+                {m.workspaces?.length ? (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {m.workspaces.map((w) => w.name).join(" · ")}
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 {canManage ? (
@@ -341,9 +392,9 @@ function OrganizationSettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="owner">Owner</SelectItem>
-                      <SelectItem value="admin">Org admin</SelectItem>
-                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="owner">{t("peoplePage.owner")}</SelectItem>
+                      <SelectItem value="admin">{t("peoplePage.admin")}</SelectItem>
+                      <SelectItem value="member">{t("peoplePage.member")}</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
@@ -362,11 +413,8 @@ function OrganizationSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Workspaces in this organization</CardTitle>
-          <CardDescription>
-            Each workspace holds runs and criteria. Isolation is enforced at the organization
-            boundary.
-          </CardDescription>
+          <CardTitle>{t("peoplePage.workspacesTitle")}</CardTitle>
+          <CardDescription>{t("peoplePage.workspacesLead")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm">
@@ -381,36 +429,40 @@ function OrganizationSettingsPage() {
               <Input
                 value={newWsName}
                 onChange={(e) => setNewWsName(e.target.value)}
-                placeholder="New workspace name"
+                placeholder={t("peoplePage.workspacePlaceholder")}
               />
-              <Button onClick={createWs} disabled={busy || !newWsName.trim()}>
-                Create
+              <Button onClick={() => void createWs()} disabled={busy || !newWsName.trim()}>
+                {t("peoplePage.createWorkspace")}
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create another organization</CardTitle>
-          <CardDescription>
-            You can belong to multiple organizations and switch from the sidebar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 max-w-md">
-            <Input
-              value={newOrgName}
-              onChange={(e) => setNewOrgName(e.target.value)}
-              placeholder="Company name"
-            />
-            <Button onClick={createOrg} disabled={busy || !newOrgName.trim()}>
-              Create org
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {canManage && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("peoplePage.auditTitle")}</CardTitle>
+            <CardDescription>{t("peoplePage.auditLead")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {audit.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("peoplePage.emptyAudit")}</p>
+            ) : (
+              audit.map((ev, i) => (
+                <div key={`${ev.event}-${ev.created_at}-${i}`} className="text-sm rounded border px-3 py-2">
+                  <div className="font-medium">{ev.event.replaceAll("_", " ")}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {[ev.actor_email, ev.target_email, new Date(ev.created_at).toLocaleString()]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

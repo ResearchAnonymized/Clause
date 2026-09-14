@@ -10,9 +10,14 @@ import {
   assertOrgMembership,
   countOrgOwners,
   createOrganizationInvite,
-  provisionOrganizationForUser,
+  recordOrgAudit,
 } from "@/lib/organizations.server";
-import { parseInviteInput, type OrganizationRole } from "@/lib/organizations";
+import {
+  inviteRoleMapping,
+  parseInviteInput,
+  type OrganizationRole,
+  type PeopleInviteRole,
+} from "@/lib/organizations";
 
 const OrgId = z.object({ organizationId: z.string().uuid() });
 
@@ -68,12 +73,31 @@ export const listOrganizationMembers = createServerFn({ method: "POST" })
         CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
         u.email
     `;
+    const memberIds = rows.map((r: any) => r.user_id as string);
+    const wsRows = memberIds.length
+      ? await sql`
+          SELECT wm.user_id, wm.role, w.id, w.name
+          FROM workspace_members wm
+          JOIN workspaces w ON w.id = wm.workspace_id
+          WHERE w.organization_id = ${data.organizationId}
+            AND wm.user_id = ANY(${memberIds}::uuid[])
+          ORDER BY w.created_at ASC
+        `
+      : [];
+    const byUser = new Map<string, { id: string; name: string; role: string }[]>();
+    for (const w of wsRows) {
+      const uid = w.user_id as string;
+      const list = byUser.get(uid) ?? [];
+      list.push({ id: w.id as string, name: w.name as string, role: w.role as string });
+      byUser.set(uid, list);
+    }
     return rows.map((r: any) => ({
       user_id: r.user_id as string,
       role: r.role as OrganizationRole,
       email: r.email as string,
       display_name: (r.display_name ?? r.full_name ?? r.email) as string,
       created_at: r.created_at,
+      workspaces: byUser.get(r.user_id as string) ?? [],
     }));
   });
 
@@ -109,50 +133,74 @@ const CreateOrg = z.object({
 export const createOrganization = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => CreateOrg.parse(data))
-  .handler(async ({ data, context }) => {
-    const { userId } = context as { userId: string };
-    return provisionOrganizationForUser({
-      userId,
-      orgName: data.name.trim(),
-      kind: data.kind,
-      workspaceName: `${data.name.trim()} workspace`,
-    });
+  .handler(async () => {
+    throw new Error("Only GPT-Lab platform admins can create organizations");
   });
 
 const InviteInput = z.object({
   organizationId: z.string().uuid(),
   email: z.string().email(),
-  role: z.enum(["admin", "member"]).default("member"),
+  role: z.enum(["admin", "member", "reviewer", "viewer"]).default("reviewer"),
+  workspaceIds: z.array(z.string().uuid()).min(1),
 });
+
+function peopleInviteRole(role: string): PeopleInviteRole {
+  if (role === "admin") return "admin";
+  if (role === "viewer") return "viewer";
+  return "reviewer";
+}
 
 export const inviteToOrganization = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => InviteInput.parse(data))
   .handler(async ({ data, context }) => {
-    const { userId } = context as { userId: string };
+    const { userId, session } = context as {
+      userId: string;
+      session: { user: { email?: string } };
+    };
+    const mapped = inviteRoleMapping(peopleInviteRole(data.role));
     const { token, inviteId, expiresAt } = await createOrganizationInvite({
       organizationId: data.organizationId,
       email: data.email,
-      role: data.role,
+      role: mapped.orgRole,
       invitedBy: userId,
+      workspaceIds: data.workspaceIds,
+      workspaceRole: mapped.workspaceRole,
     });
-    const origin = process.env.APP_URL || "http://localhost:3000";
-    const acceptUrl = `${origin}/invite/accept?token=${token}`;
-    const { sendMail } = await import("@/lib/mailer.server");
+    const { colleagueInviteMail, inviteAcceptUrl, sendMail } = await import("@/lib/mailer.server");
     const { PRODUCT_NAME } = await import("@/config/instance");
-    await sendMail({
-      to: data.email,
-      subject: `Join ${data.role} · ${PRODUCT_NAME} invite`,
-      text: `You have been invited to an organization on ${PRODUCT_NAME} as ${data.role}.\n\nAccept the invite:\n${acceptUrl}\n\nThis link expires in 14 days.`,
+    const sql = getSql();
+    const acceptUrl = inviteAcceptUrl(token);
+    const orgNameRow = await sql`
+      SELECT name FROM organizations WHERE id = ${data.organizationId} LIMIT 1
+    `;
+    const mail = colleagueInviteMail({
+      product: PRODUCT_NAME,
+      orgName: (orgNameRow[0]?.name as string) ?? undefined,
+      email: data.email.trim().toLowerCase(),
+      acceptUrl,
+    });
+    const sent = await sendMail({
+      to: data.email.trim().toLowerCase(),
+      subject: mail.subject,
+      text: mail.text,
     });
     const { recordAuthEvent } = await import("@/lib/auth/events");
     await recordAuthEvent({
       event: "invite_sent",
       userId,
       email: data.email,
-      meta: { organizationId: data.organizationId, role: data.role },
+      meta: { organizationId: data.organizationId, role: mapped.orgRole, emailed: sent.delivered },
     });
-    return { inviteId, expiresAt: expiresAt.toISOString(), acceptUrl, token };
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: userId,
+      actorEmail: session.user.email ?? null,
+      event: "invite_sent",
+      targetEmail: data.email.trim().toLowerCase(),
+      meta: { orgRole: mapped.orgRole, workspaceRole: mapped.workspaceRole, workspaceIds: data.workspaceIds },
+    });
+    return { inviteId, expiresAt: expiresAt.toISOString(), acceptUrl, token, emailed: sent.delivered };
   });
 
 const AcceptInvite = z.object({ token: z.string().min(1) });
@@ -212,6 +260,11 @@ export const revokeOrganizationInvite = createServerFn({ method: "POST" })
     const { userId } = context as { userId: string };
     await assertOrgMembership(userId, data.organizationId, ["owner", "admin"]);
     const sql = getSql();
+    const pending = await sql`
+      SELECT email FROM organization_invites
+      WHERE id = ${data.inviteId} AND organization_id = ${data.organizationId}
+      LIMIT 1
+    `;
     await sql`
       UPDATE organization_invites
       SET revoked_at = now()
@@ -219,6 +272,12 @@ export const revokeOrganizationInvite = createServerFn({ method: "POST" })
         AND organization_id = ${data.organizationId}
         AND accepted_at IS NULL
     `;
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: userId,
+      event: "invite_revoked",
+      targetEmail: (pending[0]?.email as string) ?? null,
+    });
     return { ok: true };
   });
 
@@ -250,6 +309,14 @@ export const changeOrganizationMemberRole = createServerFn({ method: "POST" })
       SET role = ${data.role}::organization_role, updated_at = now()
       WHERE organization_id = ${data.organizationId} AND user_id = ${data.userId}
     `;
+    const target = await sql`SELECT email FROM users WHERE id = ${data.userId} LIMIT 1`;
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: actorId,
+      event: "role_changed",
+      targetEmail: (target[0]?.email as string) ?? null,
+      meta: { role: data.role },
+    });
     return { ok: true };
   });
 
@@ -287,6 +354,13 @@ export const removeOrganizationMember = createServerFn({ method: "POST" })
         AND w.organization_id = ${data.organizationId}
         AND wm.user_id = ${data.userId}
     `;
+    const removed = await sql`SELECT email FROM users WHERE id = ${data.userId} LIMIT 1`;
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: actorId,
+      event: "member_removed",
+      targetEmail: (removed[0]?.email as string) ?? null,
+    });
     return { ok: true };
   });
 
@@ -373,19 +447,104 @@ export const createWorkspaceInOrganization = createServerFn({ method: "POST" })
       RETURNING id
     `;
     const workspaceId = rows[0].id as string;
-    // Add all org members to the new workspace with mapped roles
-    const members = await sql`
+    const managers = await sql`
       SELECT user_id, role FROM organization_members
       WHERE organization_id = ${data.organizationId}
+        AND role IN ('owner'::organization_role, 'admin'::organization_role)
     `;
-    for (const m of members) {
-      const wsRole =
-        m.role === "owner" ? "owner" : m.role === "admin" ? "admin" : "reviewer";
+    for (const m of managers) {
+      const wsRole = m.role === "owner" ? "owner" : "admin";
       await sql`
         INSERT INTO workspace_members (workspace_id, user_id, role)
         VALUES (${workspaceId}, ${m.user_id}, ${wsRole}::workspace_role)
         ON CONFLICT DO NOTHING
       `;
     }
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: userId,
+      event: "workspace_created",
+      meta: { workspaceId, name: data.name.trim() },
+    });
     return { workspaceId };
+  });
+
+export const listOrganizationWorkspaces = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => OrgId.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    await assertOrgMembership(userId, data.organizationId);
+    const sql = getSql();
+    const rows = await sql`
+      SELECT id, name, created_at
+      FROM workspaces
+      WHERE organization_id = ${data.organizationId}
+      ORDER BY created_at ASC
+    `;
+    return rows.map((r: any) => ({
+      id: r.id as string,
+      name: r.name as string,
+      created_at: r.created_at,
+    }));
+  });
+
+export const listOrganizationAudit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => OrgId.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    await assertOrgMembership(userId, data.organizationId, ["owner", "admin"]);
+    const sql = getSql();
+    const rows = await sql`
+      SELECT actor_email, event, target_email, meta, created_at
+      FROM organization_audit_events
+      WHERE organization_id = ${data.organizationId}
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    return rows.map((r: any) => ({
+      actor_email: (r.actor_email as string) ?? null,
+      event: r.event as string,
+      target_email: (r.target_email as string) ?? null,
+      meta: r.meta ?? {},
+      created_at: r.created_at,
+    }));
+  });
+
+const GrantWs = z.object({
+  organizationId: z.string().uuid(),
+  userId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  workspaceRole: z.enum(["admin", "reviewer", "viewer"]).default("reviewer"),
+});
+
+export const grantWorkspaceAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => GrantWs.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId: actorId } = context as { userId: string };
+    await assertOrgMembership(actorId, data.organizationId, ["owner", "admin"]);
+    await assertOrgMembership(data.userId, data.organizationId);
+    const sql = getSql();
+    const ws = await sql`
+      SELECT id FROM workspaces
+      WHERE id = ${data.workspaceId} AND organization_id = ${data.organizationId}
+      LIMIT 1
+    `;
+    if (!ws.length) throw new Error("Workspace is not in this organization");
+    await sql`
+      INSERT INTO workspace_members (workspace_id, user_id, role)
+      VALUES (${data.workspaceId}, ${data.userId}, ${data.workspaceRole}::workspace_role)
+      ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role
+    `;
+    const target = await sql`SELECT email FROM users WHERE id = ${data.userId} LIMIT 1`;
+    await recordOrgAudit({
+      organizationId: data.organizationId,
+      actorUserId: actorId,
+      event: "workspace_access_changed",
+      targetEmail: (target[0]?.email as string) ?? null,
+      meta: { workspaceId: data.workspaceId, workspaceRole: data.workspaceRole },
+    });
+    return { ok: true };
   });

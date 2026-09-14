@@ -36,6 +36,8 @@ export const reanalyseRun = createServerFn({ method: "POST" })
       .eq("id", runId)
       .maybeSingle();
     if (runErr || !run) throw new Error("Run not found");
+    const { assertCanMutateRun } = await import("@/lib/organizations.server");
+    await assertCanMutateRun(userId, runId);
     if (!run.criteria_set_id) throw new Error("Run has no criteria set");
     const workspaceId = run.workspace_id as string;
 

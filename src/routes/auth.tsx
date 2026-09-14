@@ -49,6 +49,7 @@ function AuthPage() {
     inviteRequired: boolean;
     signupOff: boolean;
   } | null>(null);
+  const [canMail, setCanMail] = useState<boolean | null>(null);
   const [resetMode, setResetMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [tab, setTab] = useState(invite || tabFromUrl === "signup" ? "signup" : "signin");
@@ -59,7 +60,10 @@ function AuthPage() {
     fetch("/api/auth", { credentials: "include" })
       .then((r) => r.json())
       .then((json) => {
-        if (!cancelled) setAccess(json.access ?? null);
+        if (!cancelled) {
+          setAccess(json.access ?? null);
+          setCanMail(typeof json.mailConfigured === "boolean" ? json.mailConfigured : null);
+        }
       })
       .catch(() => undefined);
 
@@ -163,7 +167,7 @@ function AuthPage() {
       const json = await res.json();
       if (json.error) return toast.error(json.error.message);
       setResetSent(true);
-      toast.success(t("auth.resetSent"));
+      toast.success(json.mailed ? t("auth.resetSent") : t("auth.resetNoMail"));
     } finally {
       setBusy(false);
     }
@@ -205,8 +209,17 @@ function AuthPage() {
                   <Label htmlFor="reset-email">{t("auth.email")}</Label>
                   <Input id="reset-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
-                <Button type="submit" className="w-full" disabled={busy}>{t("auth.sendReset")}</Button>
-                {resetSent && <p className="text-xs text-muted-foreground">{t("auth.resetSent")}</p>}
+                {canMail === false && (
+                  <p className="text-xs text-muted-foreground">{t("auth.resetUnavailable")}</p>
+                )}
+                <Button type="submit" className="w-full" disabled={busy || canMail === false}>
+                  {t("auth.sendReset")}
+                </Button>
+                {resetSent && (
+                  <p className="text-xs text-muted-foreground">
+                    {canMail ? t("auth.resetSent") : t("auth.resetNoMail")}
+                  </p>
+                )}
                 <button type="button" className="text-xs text-muted-foreground hover:underline w-full" onClick={() => setResetMode(false)}>
                   {t("auth.signIn")}
                 </button>
@@ -288,6 +301,10 @@ function AuthPage() {
                   <Button type="submit" className="w-full" disabled={busy}>{t("auth.createAccount")}</Button>
                   {access?.bootstrap ? (
                     <p className="text-xs text-muted-foreground text-center">{t("auth.firstAdmin")}</p>
+                  ) : access?.inviteRequired && !inviteToken ? (
+                    <p className="text-xs text-muted-foreground text-center">
+                      <Link to="/request" className="hover:underline">{t("auth.requestAccessHint")}</Link>
+                    </p>
                   ) : null}
                 </form>
               </TabsContent>

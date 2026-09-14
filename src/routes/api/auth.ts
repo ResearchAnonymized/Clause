@@ -16,7 +16,7 @@ import {
 import { signupMode } from "@/config/instance";
 import { clientKey, rateLimit } from "@/lib/auth/rate-limit";
 import { recordAuthEvent } from "@/lib/auth/events";
-import { sendMail } from "@/lib/mailer.server";
+import { mailConfigured, sendMail } from "@/lib/mailer.server";
 import { PRODUCT_NAME } from "@/config/instance";
 import { getSql } from "@/db/pool";
 import { hashInviteToken } from "@/lib/organizations.server";
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/auth")({
       GET: async () => {
         const session = await getSessionFromRequest();
         const access = await accessState();
-        return json({ session, access });
+        return json({ session, access, mailConfigured: mailConfigured() });
       },
       POST: async ({ request }) => {
         const body = (await request.json()) as {
@@ -89,6 +89,7 @@ export const Route = createFileRoute("/api/auth")({
           if (!email) return json({ error: { message: "Email required" } }, { status: 400 });
           const sql = getSql();
           const rows = await sql`SELECT id, email FROM users WHERE email = ${email} AND deactivated_at IS NULL LIMIT 1`;
+          const canMail = mailConfigured();
           if (rows[0]) {
             const token = await issueAuthToken({ purpose: "reset", userId: rows[0].id, email, hours: 2 });
             const origin = process.env.APP_URL || "http://localhost:3000";
@@ -100,7 +101,7 @@ export const Route = createFileRoute("/api/auth")({
             });
             await recordAuthEvent({ event: "password_reset_request", userId: rows[0].id, email, ip });
           }
-          return json({ ok: true });
+          return json({ ok: true, mailed: canMail });
         }
 
         if (body.action === "confirmReset") {

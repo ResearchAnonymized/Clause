@@ -98,7 +98,9 @@ function AcceptInvitePage() {
           </CardTitle>
           <CardDescription>
             {peek?.ok
-              ? `You've been invited to ${peek.orgName} as ${peek.role}.`
+              ? peek.role === "owner"
+                ? `You've been named the responsible person for ${peek.orgName}.`
+                : `You've been invited to ${peek.orgName}.`
               : peek?.error
                 ? peek.error
                 : "Loading invite…"}
@@ -117,15 +119,22 @@ function AcceptInvitePage() {
               </Link>
             </Button>
           )}
-          {user && peek?.ok && (
+          {user && peek?.ok && user.email?.toLowerCase() === peek.email?.toLowerCase() && (
             <Button className="w-full" onClick={accept} disabled={busy}>
               {busy ? "Joining…" : `Join ${peek.orgName}`}
             </Button>
           )}
           {user && peek?.ok && user.email?.toLowerCase() !== peek.email?.toLowerCase() && (
-            <p className="text-xs text-destructive">
-              You are signed in as {user.email}. Switch to {peek.email} to accept this invite.
-            </p>
+            <>
+              <p className="text-xs text-destructive">
+                You are signed in as {user.email}. Switch to {peek.email} to accept this invite.
+              </p>
+              <Button asChild variant="outline" className="w-full">
+                <Link to="/auth" search={{ invite: token, tab: "signin" }}>
+                  Sign in with the invited email
+                </Link>
+              </Button>
+            </>
           )}
         </CardContent>
       </Card>

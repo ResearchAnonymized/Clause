@@ -31,6 +31,8 @@ export const sealDecisionSignature = createServerFn({ method: "POST" })
       .eq("id", data.decisionId)
       .maybeSingle();
     if (!dec) throw new Error("Decision not found");
+    const { assertCanMutateWorkspaceWork } = await import("@/lib/organizations.server");
+    await assertCanMutateWorkspaceWork(userId, (dec as { workspace_id: string }).workspace_id);
     const { error } = await (supabase.from("decisions" as any) as any)
       .update({ signer_ip: ip })
       .eq("id", data.decisionId);

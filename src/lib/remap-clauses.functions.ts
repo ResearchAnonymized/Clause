@@ -30,6 +30,8 @@ export const remapClauses = createServerFn({ method: "POST" })
       .eq("id", runId)
       .maybeSingle();
     if (runErr || !run) throw new Error("Run not found");
+    const { assertCanMutateRun } = await import("@/lib/organizations.server");
+    await assertCanMutateRun(context.userId, runId);
     if (run.status === "running" || run.status === "queued") {
       throw new Error("Run is still analysing — wait until it completes");
     }

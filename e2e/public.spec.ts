@@ -13,4 +13,11 @@ test.describe("public pages", () => {
     await expect(page.getByRole("tab", { name: /sign in/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /theme/i })).toBeVisible();
   });
+
+  test("request access page is public", async ({ page }) => {
+    await page.goto("/request");
+    await expect(page.getByRole("heading", { name: /request access/i })).toBeVisible();
+    await expect(page.getByLabel(/organization name/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /submit request/i })).toBeVisible();
+  });
 });

@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/settings/")({
 });
 
 const ADMIN_TABS = [
-  { key: "organization", url: "/settings/organization", icon: Building2, label: "Organization" },
+  { key: "organization", url: "/settings/organization", icon: Building2, label: "People & organization" },
   { key: "aiModels", url: "/settings/llm", icon: Cpu, label: "AI models" },
   { key: "agentPrompts", url: "/settings/prompts", icon: MessageSquare, label: "Agent prompts" },
   { key: "pipelineDag", url: "/settings/pipeline", icon: GitBranch, label: "Pipeline DAG" },
@@ -41,7 +41,7 @@ const ADMIN_TABS = [
   { key: "observability", url: "/settings/observability", icon: Activity, label: "Observability" },
   { key: "errors", url: "/settings/errors", icon: HelpCircle, label: "Error log" },
   { key: "audit", url: "/settings/audit", icon: ScrollText, label: "Audit log" },
-  { key: "users", url: "/admin", icon: Users, label: "Platform users" },
+  { key: "users", url: "/admin", icon: Users, label: "Platform" },
   { key: "privacy", url: "/settings/privacy", icon: ShieldCheck, label: "Privacy & data" },
   { key: "help", url: "/settings/help", icon: BookOpen, label: "Help" },
 ] as const;

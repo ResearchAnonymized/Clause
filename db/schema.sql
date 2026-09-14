@@ -81,6 +81,7 @@ CREATE TABLE public.organization_invites (
   organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   role organization_role NOT NULL DEFAULT 'member',
+  workspace_role public.workspace_role,
   token_hash TEXT NOT NULL UNIQUE,
   invited_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
@@ -89,6 +90,48 @@ CREATE TABLE public.organization_invites (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX organization_invites_org_idx ON public.organization_invites (organization_id);
+
+CREATE TABLE public.organization_invite_workspaces (
+  invite_id UUID NOT NULL REFERENCES public.organization_invites(id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  workspace_role public.workspace_role NOT NULL DEFAULT 'reviewer',
+  PRIMARY KEY (invite_id, workspace_id)
+);
+CREATE INDEX organization_invite_workspaces_ws_idx
+  ON public.organization_invite_workspaces (workspace_id);
+
+CREATE TABLE public.organization_audit_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  actor_email TEXT,
+  event TEXT NOT NULL,
+  target_email TEXT,
+  meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX organization_audit_events_org_idx
+  ON public.organization_audit_events (organization_id, created_at DESC);
+
+CREATE TABLE public.access_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_name TEXT NOT NULL,
+  contact_email TEXT NOT NULL,
+  contact_name TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  ip TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+  decided_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  decided_at TIMESTAMPTZ,
+  decision_note TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX access_requests_status_idx
+  ON public.access_requests (status, created_at DESC);
+CREATE INDEX access_requests_email_idx
+  ON public.access_requests (lower(contact_email));
 
 CREATE TABLE public.workspaces (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

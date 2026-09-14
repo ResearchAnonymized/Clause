@@ -4,11 +4,35 @@
 
 export type OrganizationRole = "owner" | "admin" | "member";
 export type OrganizationKind = "personal" | "company";
+export type WorkspaceRole = "owner" | "admin" | "reviewer" | "viewer";
+/** Roles an org owner/admin may grant on an invite. */
+export type PeopleInviteRole = "admin" | "reviewer" | "viewer";
 
 export const ORG_ADMIN_ROLES: OrganizationRole[] = ["owner", "admin"];
 
+export const VIEWER_MUTATION_DENIED =
+  "Viewers can read this review but cannot change it.";
+
 export function canManageOrganization(role: OrganizationRole | null | undefined): boolean {
   return role === "owner" || role === "admin";
+}
+
+/** Start, remap, sign, or reopen a review. Viewers may only read. */
+export function canMutateRun(role: WorkspaceRole | null | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "reviewer";
+}
+
+export function canShareReport(role: WorkspaceRole | null | undefined): boolean {
+  return canMutateRun(role);
+}
+
+export function inviteRoleMapping(peopleRole: PeopleInviteRole): {
+  orgRole: Exclude<OrganizationRole, "owner">;
+  workspaceRole: Exclude<WorkspaceRole, "owner">;
+} {
+  if (peopleRole === "admin") return { orgRole: "admin", workspaceRole: "admin" };
+  if (peopleRole === "viewer") return { orgRole: "member", workspaceRole: "viewer" };
+  return { orgRole: "member", workspaceRole: "reviewer" };
 }
 
 export function slugifyOrgName(name: string): string {

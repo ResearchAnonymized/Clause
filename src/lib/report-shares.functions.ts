@@ -113,6 +113,8 @@ export const createReportShare = createServerFn({ method: "POST" })
     const { data: run } = await context.supabase
       .from("runs").select("workspace_id").eq("id", data.runId).maybeSingle();
     if (!run) throw new Error("Run not found");
+    const { assertCanMutateRun } = await import("@/lib/organizations.server");
+    await assertCanMutateRun(context.userId, data.runId);
     const token = newShareToken();
     const { data: row, error } = await (context.supabase.from("report_shares" as any) as any)
       .insert({

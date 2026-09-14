@@ -1,6 +1,6 @@
 # Ticket: Professional user management (Phase 1)
 
-**Status:** Ready to implement  
+**Status:** Hour-1 implementation landed (provision, named workspaces, viewer deny, People + Admin UI). Remaining: polish add-to-workspace on member row, production migrate + deploy.
 **Product:** Counterpart (GPT-Lab instance)  
 **Related code:** `src/lib/organizations.*`, `src/lib/platform-admin.functions.ts`, `src/lib/auth/session.ts`, `src/routes/_authenticated/admin.tsx`, `src/routes/_authenticated/settings/organization.tsx`, `src/routes/api/auth.ts`, `db/schema.sql`, `db/migrate-organizations.sql`, `db/migrate-saas-identity.sql`
 

@@ -4,6 +4,7 @@ import { requirePlatformAdmin } from "@/integrations/supabase/auth-middleware";
 import { getSql } from "@/db/pool";
 import { recordAuthEvent } from "@/lib/auth/events";
 import { destroyAllSessions } from "@/lib/auth/session";
+import { provisionOrganizationForOwnerInvite, reissueOwnerInvite } from "@/lib/organizations.server";
 
 export const listPlatformUsers = createServerFn({ method: "POST" })
   .middleware([requirePlatformAdmin])
@@ -72,4 +73,97 @@ export const setUserDeactivated = createServerFn({ method: "POST" })
     `;
     if (data.deactivated) await destroyAllSessions(data.userId);
     return { ok: true };
+  });
+
+export const listPlatformOrganizations = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .handler(async () => {
+    const sql = getSql();
+    const rows = await sql`
+      SELECT
+        o.id, o.name, o.created_at,
+        (SELECT count(*)::int FROM organization_members om WHERE om.organization_id = o.id) AS member_count,
+        (
+          SELECT u.email FROM organization_members om
+          JOIN users u ON u.id = om.user_id
+          WHERE om.organization_id = o.id AND om.role = 'owner'
+          ORDER BY om.created_at ASC
+          LIMIT 1
+        ) AS owner_email,
+        (
+          SELECT i.email FROM organization_invites i
+          WHERE i.organization_id = o.id
+            AND i.role = 'owner'
+            AND i.accepted_at IS NULL
+            AND i.revoked_at IS NULL
+          ORDER BY i.created_at DESC
+          LIMIT 1
+        ) AS pending_owner_email
+      FROM organizations o
+      ORDER BY o.created_at DESC
+    `;
+    return rows.map((r: any) => ({
+      id: r.id as string,
+      name: r.name as string,
+      created_at: r.created_at,
+      member_count: Number(r.member_count ?? 0),
+      owner_email: (r.owner_email as string) ?? null,
+      pending_owner_email: (r.pending_owner_email as string) ?? null,
+    }));
+  });
+
+const ProvisionOrg = z.object({
+  name: z.string().min(2).max(120),
+  ownerEmail: z.string().email(),
+  workspaceName: z.string().min(1).max(120).optional(),
+});
+
+export const provisionOrganization = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => ProvisionOrg.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    const result = await provisionOrganizationForOwnerInvite({
+      name: data.name,
+      ownerEmail: data.ownerEmail,
+      createdBy: userId,
+      workspaceName: data.workspaceName,
+    });
+    const { inviteAcceptUrl, ownerInviteMail, sendMail } = await import("@/lib/mailer.server");
+    const { PRODUCT_NAME } = await import("@/config/instance");
+    const acceptUrl = inviteAcceptUrl(result.token);
+    const mail = ownerInviteMail({
+      product: PRODUCT_NAME,
+      orgName: data.name.trim(),
+      email: data.ownerEmail.trim().toLowerCase(),
+      acceptUrl,
+    });
+    const sent = await sendMail({
+      to: data.ownerEmail.trim().toLowerCase(),
+      subject: mail.subject,
+      text: mail.text,
+    });
+    return {
+      organizationId: result.organizationId,
+      workspaceId: result.workspaceId,
+      inviteId: result.inviteId,
+      expiresAt: result.expiresAt.toISOString(),
+      acceptUrl,
+      emailed: sent.delivered,
+    };
+  });
+
+const ReissueOwner = z.object({
+  organizationId: z.string().uuid(),
+});
+
+export const reissueOwnerInviteLink = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => ReissueOwner.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    return reissueOwnerInvite({
+      organizationId: data.organizationId,
+      actorUserId: userId,
+    });
   });

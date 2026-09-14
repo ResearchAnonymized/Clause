@@ -64,9 +64,9 @@ function Landing() {
                 {t("nav.signIn")}
               </Button>
             </Link>
-            <Link to="/auth" search={{ tab: "signup" }}>
+            <Link to="/request">
               <Button size="sm" className="bg-white text-stage hover:bg-white/90 font-semibold">
-                {t("nav.createAccount")}
+                {t("nav.requestAccess")}
               </Button>
             </Link>
           </div>
@@ -89,7 +89,7 @@ function Landing() {
               {t("landing.heroLead")}
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <Link to="/auth" search={{ tab: "signup" }}>
+              <Link to="/request">
                 <Button size="lg" className="h-11 px-5 bg-white text-stage hover:bg-white/90 font-semibold">
                   {t("landing.ctaPrimary")} <ArrowRight size={16} className="ml-2" />
                 </Button>
@@ -195,9 +195,9 @@ function Landing() {
           </h2>
           <p className="mt-4 text-muted-foreground">{t("landing.ctaFinalLead")}</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/auth" search={{ tab: "signup" }}>
+            <Link to="/request">
               <Button size="lg" className="h-12 px-7 bg-brand text-brand-foreground hover:bg-brand/90 font-semibold">
-                {t("nav.createAccount")} <ArrowRight size={16} className="ml-2" />
+                {t("nav.requestAccess")} <ArrowRight size={16} className="ml-2" />
               </Button>
             </Link>
             <Link to="/auth" search={{ tab: "signin" }}>
@@ -222,7 +222,7 @@ function Landing() {
             <a href="#board" className="block hover:text-white">{t("nav.agents")}</a>
             <a href="#trust" className="block hover:text-white">{t("nav.trust")}</a>
             <Link to="/auth" search={{ tab: "signin" }} className="block hover:text-white">{t("nav.signIn")}</Link>
-            <Link to="/auth" search={{ tab: "signup" }} className="block hover:text-white">{t("nav.createAccount")}</Link>
+            <Link to="/request" className="block hover:text-white">{t("nav.requestAccess")}</Link>
           </div>
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-white">{t("nav.trust")}</p>

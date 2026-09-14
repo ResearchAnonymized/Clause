@@ -176,7 +176,7 @@ export const Route = createFileRoute("/api/db")({
               if (wsId) {
                 // Tenant isolation: workspace membership AND org membership required
                 const mem = await sql`
-                  SELECT w.organization_id
+                  SELECT w.organization_id, wm.role
                   FROM workspace_members wm
                   JOIN workspaces w ON w.id = wm.workspace_id
                   JOIN organization_members om
@@ -186,6 +186,12 @@ export const Route = createFileRoute("/api/db")({
                 `;
                 if (!mem.length) {
                   return Response.json({ data: null, error: { message: "Not a workspace member" } }, { status: 403 });
+                }
+                if (body.action !== "select") {
+                  const { canMutateRun, VIEWER_MUTATION_DENIED } = await import("@/lib/organizations");
+                  if (!canMutateRun(mem[0].role as "owner" | "admin" | "reviewer" | "viewer")) {
+                    return Response.json({ data: null, error: { message: VIEWER_MUTATION_DENIED } }, { status: 403 });
+                  }
                 }
                 // Prevent cross-org context drift
                 if (orgId && mem[0].organization_id && orgId !== mem[0].organization_id) {

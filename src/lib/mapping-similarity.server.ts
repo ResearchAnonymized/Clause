@@ -239,7 +239,7 @@ export async function overrideMappingPairStatus(params: {
 }): Promise<void> {
   const sql = getSql();
   const rows = await sql`
-    SELECT p.id, r.workspace_id
+    SELECT p.id, r.workspace_id, wm.role
     FROM run_clause_pairs p
     JOIN runs r ON r.id = p.run_id
     JOIN workspace_members wm ON wm.workspace_id = r.workspace_id
@@ -248,6 +248,10 @@ export async function overrideMappingPairStatus(params: {
     LIMIT 1
   `;
   if (!rows.length) throw new Error("Forbidden");
+  const { canMutateRun, VIEWER_MUTATION_DENIED } = await import("@/lib/organizations");
+  if (!canMutateRun(rows[0].role as "owner" | "admin" | "reviewer" | "viewer")) {
+    throw new Error(VIEWER_MUTATION_DENIED);
+  }
 
   if (params.status == null) {
     await sql`
