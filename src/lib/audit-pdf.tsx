@@ -303,10 +303,10 @@ function CoverPage(props: AuditPdfInput) {
         <Text style={S.coverBandText}>CONFIDENTIAL · CLIENT DELIVERABLE · NOT FOR EXTERNAL DISTRIBUTION</Text>
       </View>
       <View style={S.coverBody}>
-        <Text style={S.coverEyebrow}>{(props.reportTitle || "CONTRACT INTELLIGENCE  ·  AUDIT REPORT").toUpperCase()}</Text>
+        <Text style={S.coverEyebrow}>{(props.reportTitle || "CONTRACT RISK REVIEW").toUpperCase()}</Text>
         <Text style={S.coverTitle}>{props.engagementTitle}</Text>
         <Text style={S.coverSubtitle}>
-          {props.reportSubtitle || "Supplier offer assessed against the customer template"}
+          {props.reportSubtitle || "Supplier Offer vs Customer Template"}
         </Text>
         <View style={S.coverRule} />
         <View style={S.coverMetaRow}><Text style={S.coverMetaKey}>REPORT ID</Text><Text style={S.coverMetaVal}>{props.reportId}</Text></View>

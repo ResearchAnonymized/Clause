@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
-import { Link2, ArrowRight } from "lucide-react";
+import { ArrowRight, Link2 } from "lucide-react";
 import type { MappingStatus } from "@/lib/clause-mapping-status";
 
 export type ClausePair = {
@@ -38,30 +39,36 @@ export function useClausePairs(runId: string) {
   });
 }
 
-/** Compact teaser on the Analysis stream — links to the authenticated matrix. */
+/** Pinned mapping entry on the Analysis stream — always visible, not buried in findings. */
 export function ClausePairsTeaser({ runId }: { runId: string }) {
+  const { t } = useTranslation();
   const { data: pairs = [], isLoading } = useClausePairs(runId);
   if (isLoading || !pairs.length) return null;
 
   const overridden = pairs.filter((p) => p.override_status).length;
+  const gaps = pairs.filter((p) => (p.override_status ?? p.derived_status) === "deviates").length;
 
   return (
     <Link
       to="/runs/$runId/mapping"
       params={{ runId }}
-      className="flex items-center gap-2.5 rounded-lg border bg-background px-3 py-2 hover:border-brand/40 hover:bg-muted/30 transition-colors group"
+      className="shrink-0 flex items-center gap-3 border-b bg-background px-4 lg:px-5 py-3 hover:bg-muted/40 transition-colors group"
     >
-      <div className="h-8 w-8 rounded-md bg-brand-soft text-brand grid place-items-center shrink-0">
-        <Link2 className="w-3.5 h-3.5" />
+      <div className="h-9 w-9 rounded-md bg-brand-soft text-brand grid place-items-center shrink-0">
+        <Link2 className="w-4 h-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">Compliance mapping</div>
+        <div className="text-sm font-medium">{t("review.mappingTeaserTitle")}</div>
         <div className="text-xs text-muted-foreground truncate">
-          {pairs.length} requirements
-          {overridden ? ` · ${overridden} override${overridden === 1 ? "" : "s"}` : ""}
+          {t("review.mappingTeaserBody", { count: pairs.length })}
+          {gaps ? ` · ${t("review.mappingTeaserGaps", { count: gaps })}` : ""}
+          {overridden ? ` · ${t("review.mappingTeaserOverrides", { count: overridden })}` : ""}
         </div>
       </div>
-      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-brand transition-colors" />
+      <span className="text-xs font-medium text-brand inline-flex items-center gap-1 shrink-0">
+        {t("review.mappingTeaserCta")}
+        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+      </span>
     </Link>
   );
 }

@@ -1,13 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useEffect } from "react";
-import { Printer, Download, ArrowUpRight, AlertTriangle, XCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { downloadGapBriefCsv, type GapBrief as GapBriefData, type EvidenceSide } from "@/lib/gap-brief";
 import { verdictI18nKey } from "@/lib/verdict";
+import { cn } from "@/lib/utils";
 
 export function GapBrief({
   runId,
@@ -19,23 +18,13 @@ export function GapBrief({
   brief: GapBriefData;
 }) {
   const { t } = useTranslation();
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.location.hash !== "#gap-report") return;
     document.getElementById("gap-report")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
-  if (!brief.items.length) return null;
-
-  function printBrief() {
-    document.body.classList.add("printing-gap-brief");
-    const cleanup = () => {
-      document.body.classList.remove("printing-gap-brief");
-      window.removeEventListener("afterprint", cleanup);
-    };
-    window.addEventListener("afterprint", cleanup);
-    window.print();
-    window.setTimeout(cleanup, 1000);
-  }
 
   function downloadCsv() {
     downloadGapBriefCsv(title, brief);
@@ -43,100 +32,129 @@ export function GapBrief({
   }
 
   const summary =
-    brief.gapCount > 0 && brief.partialCount > 0
-      ? t("report.gapBrief.summaryBoth", { gaps: brief.gapCount, partials: brief.partialCount })
-      : brief.gapCount > 0
-        ? t("report.gapBrief.summaryGaps", { count: brief.gapCount })
-        : t("report.gapBrief.summaryPartials", { count: brief.partialCount });
+    brief.items.length === 0
+      ? t("report.memo.noMaterialIssues")
+      : brief.gapCount > 0 && brief.partialCount > 0
+        ? t("report.gapBrief.summaryBoth", { gaps: brief.gapCount, partials: brief.partialCount })
+        : brief.gapCount > 0
+          ? t("report.gapBrief.summaryGaps", { count: brief.gapCount })
+          : t("report.gapBrief.summaryPartials", { count: brief.partialCount });
 
   return (
-    <Card id="gap-report" className="gap-brief-print border-critical/25">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <CardTitle className="text-base">{t("report.gapBrief.title")}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">{summary}</p>
-          </div>
-          <div className="flex items-center gap-2 gap-brief-no-print">
-            <Button variant="outline" size="sm" onClick={downloadCsv}>
-              <Download className="w-4 h-4 mr-1" />
-              {t("report.gapBrief.csv")}
-            </Button>
-            <Button size="sm" onClick={printBrief}>
-              <Printer className="w-4 h-4 mr-1" />
-              {t("report.gapBrief.print")}
-            </Button>
-          </div>
+    <section id="gap-report" className="report-section">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="report-h2">{t("report.memo.sectionIssues")}</h2>
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{summary}</p>
         </div>
-        <p className="hidden print:block text-xs text-muted-foreground mt-2">{title}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {brief.items.map((item, i) => {
-          const Icon = item.verdict === "gap" ? XCircle : AlertTriangle;
-          const tone = item.verdict === "gap" ? "text-critical" : "text-warning";
-          return (
-            <article key={item.id} className="rounded-xl border bg-card overflow-hidden break-inside-avoid">
-              <div className="flex items-start justify-between gap-3 px-4 py-3 border-b bg-muted/30">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {i + 1} · {item.category}
+        {brief.items.length > 0 && (
+          <Button variant="ghost" size="sm" className="gap-brief-no-print h-8 text-xs text-muted-foreground shrink-0" onClick={downloadCsv}>
+            {t("report.gapBrief.csv")}
+          </Button>
+        )}
+      </div>
+
+      {brief.items.length > 0 && (
+        <ol className="mt-6 divide-y border-y">
+          {brief.items.map((item, i) => {
+            const hasLanguage = !item.customer.silent || !item.supplier.silent;
+            const open = openIds.has(item.id);
+            return (
+              <li key={item.id} className="break-inside-avoid py-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-display text-[1.05rem] leading-snug tracking-tight min-w-0 [overflow-wrap:anywhere]">
+                    <span className="text-muted-foreground font-sans text-xs tabular-nums">2.{i + 1}</span>{" "}
+                    {item.name}
+                  </h3>
+                  <span
+                    className={cn(
+                      "shrink-0 text-[11px] font-medium mt-1",
+                      item.verdict === "gap" ? "text-critical" : "text-warning",
+                    )}
+                  >
+                    {t(verdictI18nKey[item.verdict])}
+                  </span>
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1">{item.category}</div>
+
+                {item.justification && (
+                  <ClampedText text={item.justification} more={t("report.memo.showMore")} less={t("report.memo.showLess")} />
+                )}
+
+                {item.recommendedAction && (
+                  <div className="mt-3">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("report.gapBrief.ask")}
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed [overflow-wrap:anywhere]">{item.recommendedAction}</p>
                   </div>
-                  <h3 className="text-sm font-semibold mt-0.5 leading-snug">{item.name}</h3>
-                </div>
-                <Badge variant="outline" className={`${tone} border-current/30 shrink-0`}>
-                  <Icon className="w-3 h-3 mr-1" />
-                  {t(verdictI18nKey[item.verdict])}
-                </Badge>
-              </div>
+                )}
 
-              <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
-                <EvidenceColumn
-                  runId={runId}
-                  side="customer"
-                  label={t("report.gapBrief.customer")}
-                  evidence={item.customer}
-                  openLabel={t("report.gapBrief.openSection")}
-                  silentLabel={t("report.gapBrief.customerSilent")}
-                />
-                <EvidenceColumn
-                  runId={runId}
-                  side="supplier"
-                  label={t("report.gapBrief.supplier")}
-                  evidence={item.supplier}
-                  openLabel={t("report.gapBrief.openSection")}
-                  silentLabel={t("report.gapBrief.supplierSilent")}
-                />
-              </div>
-
-              {(item.justification || item.recommendedAction) && (
-                <div className="px-4 py-3 border-t space-y-3 bg-muted/20">
-                  {item.justification && (
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {t("report.gapBrief.why")}
-                      </div>
-                      <p className="text-sm leading-relaxed mt-1">{item.justification}</p>
+                {hasLanguage && (
+                  <>
+                    <button
+                      type="button"
+                      className="gap-brief-no-print mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      aria-expanded={open}
+                      onClick={() => {
+                        setOpenIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+                      {open ? t("report.memo.hideLanguage") : t("report.memo.showLanguage")}
+                    </button>
+                    <div className={cn("mt-4 grid gap-5 sm:grid-cols-2", !open && "hidden print:grid")}>
+                      <EvidenceBlock
+                        runId={runId}
+                        side="customer"
+                        label={t("report.memo.tender")}
+                        evidence={item.customer}
+                        openLabel={t("report.gapBrief.openSection")}
+                        silentLabel={t("report.gapBrief.customerSilent")}
+                      />
+                      <EvidenceBlock
+                        runId={runId}
+                        side="supplier"
+                        label={t("report.memo.bidder")}
+                        evidence={item.supplier}
+                        openLabel={t("report.gapBrief.openSection")}
+                        silentLabel={t("report.gapBrief.supplierSilent")}
+                      />
                     </div>
-                  )}
-                  {item.recommendedAction && (
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {t("report.gapBrief.ask")}
-                      </div>
-                      <p className="text-sm leading-relaxed mt-1">{item.recommendedAction}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </CardContent>
-    </Card>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 
-function EvidenceColumn({
+function ClampedText({ text, more, less }: { text: string; more: string; less: string }) {
+  const long = text.length > 180;
+  const [open, setOpen] = useState(false);
+  const shown = !long || open ? text : `${text.slice(0, 160).trimEnd()}…`;
+  return (
+    <div className="mt-3">
+      <p className="text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere] print:hidden">{shown}</p>
+      {long && (
+        <button type="button" className="gap-brief-no-print mt-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setOpen((v) => !v)}>
+          {open ? less : more}
+        </button>
+      )}
+      <p className="hidden print:block text-sm leading-relaxed [overflow-wrap:anywhere]">{text}</p>
+    </div>
+  );
+}
+
+function EvidenceBlock({
   runId,
   side,
   label,
@@ -153,18 +171,17 @@ function EvidenceColumn({
 }) {
   const quote = evidence.excerpt ?? undefined;
   return (
-    <div className="p-4 min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-      {evidence.section && (
-        <div className="text-xs font-medium mt-1.5 text-foreground">{evidence.section}</div>
-      )}
-      {evidence.filename && (
-        <div className="text-[11px] text-muted-foreground truncate mt-0.5">{evidence.filename}</div>
+    <div className="min-w-0">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      {(evidence.section || evidence.filename) && (
+        <div className="text-xs text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+          {[evidence.section, evidence.filename].filter(Boolean).join(" · ")}
+        </div>
       )}
       {evidence.silent ? (
-        <p className="text-sm text-muted-foreground mt-3 italic">{silentLabel}</p>
+        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{silentLabel}</p>
       ) : (
-        <blockquote className="text-sm leading-relaxed mt-3 border-l-2 border-brand/40 pl-3 text-foreground/90">
+        <blockquote className="mt-2 text-sm leading-relaxed text-foreground/90 border-l border-foreground/20 pl-3 [overflow-wrap:anywhere]">
           {evidence.excerpt}
         </blockquote>
       )}
@@ -173,7 +190,7 @@ function EvidenceColumn({
           to="/runs/$runId"
           params={{ runId }}
           search={{ view: "documents", side, quote: quote.slice(0, 400) }}
-          className="gap-brief-no-print inline-flex items-center gap-1 text-xs text-brand hover:underline mt-3"
+          className="gap-brief-no-print inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-2"
         >
           {openLabel}
           <ArrowUpRight className="w-3 h-3" />

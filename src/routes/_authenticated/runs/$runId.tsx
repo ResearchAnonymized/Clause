@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { toVerdict, verdictTone, type Verdict } from "@/lib/verdict";
-import { ChevronLeft, ChevronRight, FileText, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, Columns2, FileStack, ListChecks, Link2, LocateFixed } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, FileStack, LocateFixed } from "lucide-react";
 import { toast } from "sonner";
 import {
   ANALYZER_VERSION,
@@ -27,7 +27,7 @@ import { ClausePairsTeaser } from "@/components/pack/clause-pairs-panel";
 import { findQuoteInText } from "@/lib/highlight-quote";
 import { locateInDocument } from "@/lib/evidence-locator";
 import { cn } from "@/lib/utils";
-import { PageBack } from "@/components/page-back";
+import { RunWorkspaceLayout, type RunWorkspacePage } from "@/components/run-workspace-layout";
 import { computeReportData } from "@/lib/report-data";
 
 type RunViewMode = "findings" | "documents" | "compare";
@@ -587,115 +587,67 @@ function ReviewRoomPage() {
 
   const isStale = runStaleness.level !== "fresh";
   const isCriticallyStale = runStaleness.level === "critical";
+  const workspacePage: RunWorkspacePage =
+    viewMode === "compare" ? "compare" : viewMode === "documents" ? "documents" : "analysis";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="border-b bg-background px-4 lg:px-6 py-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <PageBack
-              label={t("runDetail.allAnalyses")}
-              fallback={{ to: "/runs" }}
-              preferFallback
-            />
-            <div className="hidden sm:block h-5 w-px bg-border" />
-            <div className="min-w-0">
-              <h1 className="font-sans font-semibold truncate text-[15px] tracking-tight">{run.title}</h1>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                {t("review.requirementCount", { count: rows.length })}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="hidden md:flex items-center gap-1.5">
-              <CountChip verdict="gap" n={counts.gap} />
-              <CountChip verdict="partial" n={counts.partial} />
-              <CountChip verdict="aligned" n={counts.aligned} />
-            </div>
-            <div className="flex rounded-lg border border-border/70 p-0.5 bg-muted/40">
-              {(
-                [
-                  { id: "findings" as const, label: t("review.viewAnalysis"), icon: ListChecks },
-                  { id: "documents" as const, label: t("review.viewDocuments"), icon: FileStack },
-                  { id: "compare" as const, label: t("review.viewCompare"), icon: Columns2 },
-                ] as const
-              ).map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => goToView(m.id, { quote: m.id === "documents" ? evidenceQuote || null : null })}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors",
-                    viewMode === m.id
-                      ? "bg-background shadow-sm font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <m.icon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{m.label}</span>
-                </button>
-              ))}
-            </div>
-            <Link
-              to="/runs/$runId/mapping"
-              params={{ runId }}
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-1.5 py-1"
-            >
-              <Link2 className="w-3.5 h-3.5" />
-              {t("review.mappingShort")}
-            </Link>
-            <Link
-              to="/runs/$runId/report"
-              params={{ runId }}
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-1.5 py-1"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              {t("review.reportShort")}
-            </Link>
-          </div>
+    <RunWorkspaceLayout
+      runId={runId}
+      page={workspacePage}
+      title={run.title}
+      subtitle={t("review.requirementCount", { count: rows.length })}
+      fill
+      actions={
+        <div className="hidden md:flex items-center gap-1.5">
+          <CountChip verdict="gap" n={counts.gap} />
+          <CountChip verdict="partial" n={counts.partial} />
+          <CountChip verdict="aligned" n={counts.aligned} />
         </div>
-      </div>
-
-      {isLive && (
-        <div className="border-b bg-brand-soft/50 text-brand text-xs px-4 lg:px-6 py-2 flex items-center gap-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          {t("review.stillWorking")}
-        </div>
-      )}
-
-      {isStale && !isLive && (
-        <div
-          className={cn(
-            "border-b px-4 lg:px-6 py-2 flex items-center gap-3 text-xs",
-            isCriticallyStale
-              ? "bg-warning/10 text-warning-foreground"
-              : "bg-muted/50 text-muted-foreground",
+      }
+      banner={
+        <>
+          {isLive && (
+            <div className="border-b bg-brand-soft/50 text-brand text-xs px-4 lg:px-6 py-2 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {t("review.stillWorking")}
+            </div>
           )}
-        >
-          <Clock className={cn("w-3.5 h-3.5 shrink-0", isCriticallyStale ? "text-warning" : "text-muted-foreground")} />
-          <div className="min-w-0 flex-1">
-            <span className="font-medium text-foreground">
-              {isCriticallyStale ? t("review.staleCritical") : t("review.staleMinor")}
-            </span>
-            {runStaleness.reason ? (
-              <span className="text-muted-foreground"> — {runStaleness.reason}</span>
-            ) : null}
-          </div>
-          <Button
-            size="sm"
-            variant={isCriticallyStale ? "default" : "outline"}
-            className="h-7 px-2.5 text-xs shrink-0"
-            disabled={reanalysing}
-            onClick={onReanalyse}
-          >
-            {reanalysing ? (
-              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> {t("review.reanalysing")}</>
-            ) : (
-              <><RefreshCw className="w-3 h-3 mr-1" /> {t("review.reanalyse")}</>
-            )}
-          </Button>
-        </div>
-      )}
+          {isStale && !isLive && (
+            <div
+              className={cn(
+                "border-b px-4 lg:px-6 py-2 flex items-center gap-3 text-xs",
+                isCriticallyStale
+                  ? "bg-warning/10 text-warning-foreground"
+                  : "bg-muted/50 text-muted-foreground",
+              )}
+            >
+              <Clock className={cn("w-3.5 h-3.5 shrink-0", isCriticallyStale ? "text-warning" : "text-muted-foreground")} />
+              <div className="min-w-0 flex-1">
+                <span className="font-medium text-foreground">
+                  {isCriticallyStale ? t("review.staleCritical") : t("review.staleMinor")}
+                </span>
+                {runStaleness.reason ? (
+                  <span className="text-muted-foreground"> — {runStaleness.reason}</span>
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant={isCriticallyStale ? "default" : "outline"}
+                className="h-7 px-2.5 text-xs shrink-0"
+                disabled={reanalysing}
+                onClick={onReanalyse}
+              >
+                {reanalysing ? (
+                  <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> {t("review.reanalysing")}</>
+                ) : (
+                  <><RefreshCw className="w-3 h-3 mr-1" /> {t("review.reanalyse")}</>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      }
+    >
 
       {(viewMode === "documents" || viewMode === "compare") && (
         <div className="flex-1 min-h-0 flex flex-col">
@@ -741,9 +693,10 @@ function ReviewRoomPage() {
             />
           )}
 
+          <ClausePairsTeaser runId={runId} />
+
           <ScrollArea className="flex-1">
             <div className="p-4 lg:p-5 space-y-7">
-              <ClausePairsTeaser runId={runId} />
               {streamGroups.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground p-8">
                   {isLive ? t("runDetail.agentsWorking") : t("runDetail.noFindings")}
@@ -921,7 +874,7 @@ function ReviewRoomPage() {
         </div>
       </div>
       )}
-    </div>
+    </RunWorkspaceLayout>
   );
 }
 

@@ -10,10 +10,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Link2, ListChecks, Loader2, RefreshCw, Table2 } from "lucide-react";
+import { Download, Loader2, RefreshCw, Table2 } from "lucide-react";
 import { useClausePairs } from "@/components/pack/clause-pairs-panel";
 import { MappingWorkspace } from "@/components/pack/mapping-workspace";
-import { PageBack, PageBreadcrumbs } from "@/components/page-back";
+import { RunWorkspaceLayout } from "@/components/run-workspace-layout";
 import { OnboardingStepMarker } from "@/components/onboarding-step-marker";
 import { remapClauses } from "@/lib/remap-clauses.functions";
 import { exportMappingCsv, exportMappingPdf } from "@/lib/export-mapping";
@@ -113,126 +113,87 @@ function MappingPage() {
   const title = run?.title ?? "Untitled run";
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
-      <OnboardingStepMarker step="opened_mapping" />
-      <div className="border-b bg-background/80 backdrop-blur px-4 lg:px-6 py-3 sticky top-0 z-20">
-        <div className="flex items-center justify-between gap-3 flex-wrap max-w-6xl mx-auto w-full">
-          <div className="flex items-center gap-3 min-w-0">
-            <PageBack
-              label="Back to analysis"
-              fallback={{
-                to: "/runs/$runId",
-                params: { runId },
-                search: { view: undefined, side: undefined, quote: undefined },
-              }}
-            />
-            <div className="hidden sm:block h-5 w-px bg-border" />
-            <div className="min-w-0">
-              <PageBreadcrumbs
-                className="mb-0.5"
-                items={[
-                  { label: "Analyses", to: "/runs" },
-                  {
-                    label: title,
-                    to: "/runs/$runId",
-                    params: { runId },
-                    search: { view: undefined, side: undefined, quote: undefined },
-                  },
-                  { label: "Compliance mapping" },
-                ]}
-              />
-              <div className="flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-brand shrink-0" />
-                <h1 className="font-semibold text-sm truncate">Compliance mapping</h1>
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {title} · tender ↔ bidder requirements matrix
-              </div>
+    <RunWorkspaceLayout
+      runId={runId}
+      page="mapping"
+      title={title}
+      subtitle={
+        isLoading
+          ? "…"
+          : `${pairs.length} requirement${pairs.length === 1 ? "" : "s"} · tender ↔ bidder`
+      }
+      actions={
+        <>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/runs/bidders" search={{ runs: runId }}>
+              <Table2 className="w-4 h-4 mr-1" />
+              Multi-bidder
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={remapping || runBusy}
+            onClick={onRemap}
+            title={runBusy ? "Wait for analysis to finish" : "Re-run requirement mapping only"}
+          >
+            {remapping ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-1" />
+            )}
+            Re-map
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!pairs.length}>
+                <Download className="w-4 h-4 mr-1" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  exportMappingPdf(title, runId, pairs, findings);
+                  toast.success("Requirements annex downloaded");
+                }}
+              >
+                Requirements annex PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  exportMappingCsv(title, runId, pairs, findings);
+                  toast.success("Requirements CSV downloaded");
+                }}
+              >
+                Requirements CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      }
+      banner={
+        history.length > 0 ? (
+          <div className="border-b bg-muted/20 px-4 lg:px-6 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground/80">Mapping history</span>
+              {history.map((h, i) => (
+                <span
+                  key={`${h.at}-${i}`}
+                  className="inline-flex items-center rounded-md border bg-background px-2 py-0.5 tabular-nums"
+                  title={h.model ? `Model: ${h.model}` : undefined}
+                >
+                  {h.source === "remap" ? "Re-map" : "Analysis"} · {h.pairs} ·{" "}
+                  {new Date(h.at).toLocaleString()}
+                </span>
+              ))}
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {isLoading ? "…" : `${pairs.length} requirement${pairs.length === 1 ? "" : "s"}`}
-            </span>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/runs/bidders" search={{ runs: runId }}>
-                <Table2 className="w-4 h-4 mr-1" />
-                Multi-bidder
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={remapping || runBusy}
-              onClick={onRemap}
-              title={runBusy ? "Wait for analysis to finish" : "Re-run requirement mapping only"}
-            >
-              {remapping ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-1" />
-              )}
-              Re-map
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!pairs.length}>
-                  <Download className="w-4 h-4 mr-1" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => {
-                    exportMappingPdf(title, runId, pairs, findings);
-                    toast.success("Requirements annex downloaded");
-                  }}
-                >
-                  Requirements annex PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    exportMappingCsv(title, runId, pairs, findings);
-                    toast.success("Requirements CSV downloaded");
-                  }}
-                >
-                  Requirements CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" asChild>
-              <Link
-                to="/runs/$runId"
-                params={{ runId }}
-                search={{ view: undefined, side: undefined, quote: undefined }}
-              >
-                <ListChecks className="w-4 h-4 mr-1" />
-                Analysis
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {history.length > 0 && (
-        <div className="border-b bg-muted/20 px-4 lg:px-6 py-2">
-          <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="font-semibold text-foreground/80">Mapping history</span>
-            {history.map((h, i) => (
-              <span
-                key={`${h.at}-${i}`}
-                className="inline-flex items-center rounded-md border bg-background px-2 py-0.5 tabular-nums"
-                title={h.model ? `Model: ${h.model}` : undefined}
-              >
-                {h.source === "remap" ? "Re-map" : "Analysis"} · {h.pairs} ·{" "}
-                {new Date(h.at).toLocaleString()}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 p-4 lg:p-8">
+        ) : null
+      }
+    >
+      <OnboardingStepMarker step="opened_mapping" />
+      <div className="p-4 lg:p-8">
         <div className="max-w-6xl mx-auto">
           {isLoading || remapping ? (
             <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-sm">
@@ -252,15 +213,6 @@ function MappingPage() {
                   )}
                   Re-map requirements
                 </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link
-                    to="/runs/$runId"
-                    params={{ runId }}
-                    search={{ view: undefined, side: undefined, quote: undefined }}
-                  >
-                    Back to analysis
-                  </Link>
-                </Button>
               </div>
             </div>
           ) : (
@@ -268,7 +220,7 @@ function MappingPage() {
           )}
         </div>
       </div>
-    </div>
+    </RunWorkspaceLayout>
   );
 }
 

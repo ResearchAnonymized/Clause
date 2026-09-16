@@ -4,8 +4,10 @@ import { DocumentViewer } from "@/components/pack/document-viewer";
 import { suggestAnnexPairs, displayPath, kindLabel } from "@/lib/pack-utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeftRight, Columns2, FileStack } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import type { Severity, Verdict } from "@/lib/verdict";
 
 type Props = {
@@ -34,6 +36,7 @@ export function PackWorkspace({
   verdict,
   className,
 }: Props) {
+  const { t } = useTranslation();
   const tender = useMemo(() => docs.filter((d) => d.role === "customer"), [docs]);
   const bidder = useMemo(() => docs.filter((d) => d.role === "supplier"), [docs]);
   const pairs = useMemo(() => suggestAnnexPairs(tender, bidder), [tender, bidder]);
@@ -120,7 +123,7 @@ export function PackWorkspace({
   if (!compareReady && mode === "compare") {
     return (
       <div className={cn("flex items-center justify-center text-sm text-muted-foreground", className)}>
-        Preparing compare view…
+        {t("review.comparePreparing")}
       </div>
     );
   }
@@ -133,14 +136,10 @@ export function PackWorkspace({
 
     return (
       <div className={cn("flex flex-col min-h-0 h-full", className)}>
-        <div className="border-b px-3 py-2.5 flex flex-col gap-2 bg-background/80 shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Columns2 className="w-4 h-4 text-brand shrink-0" />
-            <div className="text-sm font-medium">Side-by-side compare</div>
-            <div className="text-xs text-muted-foreground">
-              Pick a mapped annex so both sides show the same requirement
-            </div>
-          </div>
+        <div className="border-b px-4 py-2.5 flex items-center gap-2 flex-wrap bg-background shrink-0">
+          <div className="text-sm font-medium">{t("review.compareTitle")}</div>
+          <div className="text-xs text-muted-foreground">{t("review.compareHint")}</div>
+          <div className="flex-1" />
           {pairs.length > 0 ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               {pairs.map((p) => {
@@ -161,21 +160,20 @@ export function PackWorkspace({
               })}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">
-              No automatic annex pairs — select matching files in each list.
-            </div>
-          )}
-          {!kindsMatch && tenderDoc && bidderDoc && (
-            <div className="text-[11px] text-warning">
-              Different document types selected ({kindLabel(tenderDoc.doc_kind)} vs{" "}
-              {kindLabel(bidderDoc.doc_kind)}). Choose a mapped annex above for a like-for-like
-              compare.
-            </div>
+            <div className="text-xs text-muted-foreground">{t("review.comparePickFiles")}</div>
           )}
         </div>
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr]">
+        {!kindsMatch && tenderDoc && bidderDoc && (
+          <div className="px-4 py-1.5 text-[11px] text-warning border-b bg-warning/5">
+            {t("review.compareTypeMismatch", {
+              tender: kindLabel(tenderDoc.doc_kind),
+              bidder: kindLabel(bidderDoc.doc_kind),
+            })}
+          </div>
+        )}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2">
           <ComparePane
-            label="Tender pack"
+            label={t("dashboard.tenderPack")}
             tone="tender"
             docs={tender}
             selectedId={tenderDoc?.id ?? null}
@@ -188,14 +186,10 @@ export function PackWorkspace({
             fallbackNeedle={fallbackNeedle}
             severity={severity}
             verdict={verdict}
+            pickLabel={t("review.comparePickFile")}
           />
-          <div className="hidden lg:flex items-center justify-center px-1 bg-muted/30 border-x">
-            <div className="rounded-full border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">
-              vs
-            </div>
-          </div>
           <ComparePane
-            label="Bidder pack"
+            label={t("dashboard.bidderPack")}
             tone="bidder"
             docs={bidder}
             selectedId={bidderDoc?.id ?? null}
@@ -208,6 +202,7 @@ export function PackWorkspace({
             fallbackNeedle={fallbackNeedle}
             severity={severity}
             verdict={verdict}
+            pickLabel={t("review.comparePickFile")}
           />
         </div>
       </div>
@@ -217,8 +212,7 @@ export function PackWorkspace({
   return (
     <div className={cn("flex flex-col min-h-0 h-full", className)}>
       <div className="border-b px-3 py-2 flex items-center gap-2 bg-background/80 shrink-0">
-        <FileStack className="w-4 h-4 text-brand shrink-0" />
-        <div className="text-sm font-medium">Document pack</div>
+        <div className="text-sm font-medium">{t("review.viewDocuments")}</div>
         <div className="flex rounded-md border p-0.5 ml-2">
           <button
             type="button"
@@ -300,6 +294,7 @@ function ComparePane({
   fallbackNeedle,
   severity,
   verdict,
+  pickLabel,
 }: {
   label: string;
   tone: "tender" | "bidder";
@@ -311,44 +306,40 @@ function ComparePane({
   fallbackNeedle?: string;
   severity?: Severity;
   verdict?: Verdict | null;
+  pickLabel: string;
 }) {
   return (
-    <div className="flex flex-col min-h-0 border-t lg:border-t-0">
-      <div className="grid grid-cols-[220px_1fr] min-h-0 flex-1">
-        <PackBrowser
-          docs={docs}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          title={label}
-          tone={tone}
+    <div className={cn("flex flex-col min-h-0 border-t lg:border-t-0", tone === "bidder" && "lg:border-l")}>
+      <div
+        className={cn(
+          "px-3 py-2 border-b shrink-0 space-y-1.5",
+          tone === "bidder" ? "bg-amber-500/[0.06]" : "bg-sky-500/[0.06]",
+        )}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+        <Select value={selectedId ?? undefined} onValueChange={onSelect} disabled={!docs.length}>
+          <SelectTrigger className="h-8 text-xs bg-background">
+            <SelectValue placeholder={pickLabel} />
+          </SelectTrigger>
+          <SelectContent>
+            {docs.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.filename}
+                {d.doc_kind ? ` · ${kindLabel(d.doc_kind)}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex-1 min-h-0 bg-background">
+        <DocumentViewer
+          doc={doc}
+          quote={quote}
+          fallbackNeedle={fallbackNeedle}
+          severity={severity}
+          verdict={verdict}
+          showFilename={false}
         />
-        <div className="flex flex-col min-h-0 min-w-0 bg-background">
-          <div
-            className={cn(
-              "px-3 py-2 border-b text-[11px] flex items-center gap-2 shrink-0",
-              tone === "bidder" ? "bg-amber-500/[0.06]" : "bg-sky-500/[0.06]",
-            )}
-          >
-            <span className="font-semibold text-foreground truncate">
-              {doc ? doc.filename : "No file selected"}
-            </span>
-            {doc?.doc_kind && (
-              <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal shrink-0">
-                {kindLabel(doc.doc_kind)}
-              </Badge>
-            )}
-          </div>
-          <div className="flex-1 min-h-0">
-            <DocumentViewer
-              doc={doc}
-              quote={quote}
-              fallbackNeedle={fallbackNeedle}
-              severity={severity}
-              verdict={verdict}
-              showFilename={false}
-            />
-          </div>
-        </div>
       </div>
     </div>
   );
