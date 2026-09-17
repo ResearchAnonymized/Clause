@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { toVerdict, verdictTone, type Verdict } from "@/lib/verdict";
-import { ChevronLeft, ChevronRight, FileText, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, FileStack, LocateFixed } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, FileStack, LocateFixed } from "lucide-react";
 import { toast } from "sonner";
 import {
   ANALYZER_VERSION,
@@ -22,7 +22,7 @@ import { reanalyseRun } from "@/lib/reanalyse-run.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PackWorkspace } from "@/components/pack/pack-workspace";
-import { DocumentViewer, fileKindLabel, scrollToEvidenceQuote, type EvidenceLayout } from "@/components/pack/document-viewer";
+import { DocumentViewer, scrollToEvidenceQuote, type EvidenceLayout } from "@/components/pack/document-viewer";
 import { ClausePairsTeaser } from "@/components/pack/clause-pairs-panel";
 import { findQuoteInText } from "@/lib/highlight-quote";
 import { locateInDocument } from "@/lib/evidence-locator";
@@ -278,16 +278,6 @@ function ReviewRoomPage() {
     setViewMode(search.view ?? "findings");
     if (search.side) setEvidenceSide(search.side);
   }, [search.view, search.quote, search.side]);
-  const supplierPackLabel =
-    supplierDocs.length <= 1
-      ? (supplierDocs[0]?.filename ?? null)
-      : t("runDetail.filesCount", { count: supplierDocs.length });
-  const tenderPackHint =
-    customerDocs.length === 0
-      ? null
-      : customerDocs.length === 1
-        ? (customerDocs[0]?.filename ?? null)
-        : t("runDetail.filesCount", { count: customerDocs.length });
 
   const anySupplierText = useMemo(
     () =>
@@ -336,15 +326,6 @@ function ReviewRoomPage() {
       rec.kind === "reject" ? "do_not_sign" : rec.kind === "sign" ? "safe" : rec.kind;
     return { kind, headline: rec.headline, reason: rec.reason, score: report.score };
   }, [report]);
-
-  // Top blockers — highest severity, capped at 3.
-  const blockers = useMemo(() => {
-    const rank: Record<Verdict, number> = { gap: 0, partial: 1, aligned: 2, not_addressed: 3 };
-    return [...rows]
-      .filter((r) => r.finding)
-      .sort((a, b) => rank[toVerdict(a.finding?.severity)] - rank[toVerdict(b.finding?.severity)])
-      .slice(0, 3);
-  }, [rows]);
 
   // ---- Pipeline staleness --------------------------------------------------
   // Findings + docs may have been produced by an older extractor / chunker /
@@ -595,15 +576,11 @@ function ReviewRoomPage() {
       runId={runId}
       page={workspacePage}
       title={run.title}
-      subtitle={t("review.requirementCount", { count: rows.length })}
+      subtitle={[
+        t("review.requirementCount", { count: rows.length }),
+        t("review.packLine", { tender: customerDocs.length, bidder: supplierDocs.length }),
+      ].join(" · ")}
       fill
-      actions={
-        <div className="hidden md:flex items-center gap-1.5">
-          <CountChip verdict="gap" n={counts.gap} />
-          <CountChip verdict="partial" n={counts.partial} />
-          <CountChip verdict="aligned" n={counts.aligned} />
-        </div>
-      }
       banner={
         <>
           {isLive && (
@@ -671,10 +648,6 @@ function ReviewRoomPage() {
           recommendation={recommendation}
           counts={counts}
           totalCount={rows.length}
-          blockers={blockers}
-          supplierFilename={supplierPackLabel}
-          tenderPackHint={tenderPackHint}
-          onPickBlocker={(id) => selectFinding(id)}
           staleness={runStaleness}
           reviewSigned={(run as any)?.review_status === "signed"}
         />
@@ -787,11 +760,6 @@ function ReviewRoomPage() {
                   <div className="truncate text-sm font-medium">{evidenceDoc?.filename ?? "—"}</div>
                 )}
               </div>
-              {evidenceDoc && (
-                <span className="shrink-0 rounded border border-border/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {fileKindLabel(evidenceDoc)}
-                </span>
-              )}
               <Button
                 type="button"
                 size="sm"
@@ -803,7 +771,7 @@ function ReviewRoomPage() {
                 {t("review.openPack")}
               </Button>
             </div>
-            {active?.finding && (
+            {active?.finding ? (
               <div className="px-3 pb-2.5">
                 <div className="rounded-md border bg-muted/40 px-2.5 py-2">
                   <div className="flex items-start gap-2">
@@ -833,22 +801,6 @@ function ReviewRoomPage() {
                     {locatorIsRelated && (
                       <span className="text-[10px] text-muted-foreground">{t("review.relatedPassage")}</span>
                     )}
-                    {evidenceMarks.length > 0 && (
-                      <span className="inline-flex items-center gap-2 text-[10px] text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-critical" />
-                          {t("verdict.gap")}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-                          {t("verdict.partial")}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-ok" />
-                          {t("verdict.aligned")}
-                        </span>
-                      </span>
-                    )}
                     {evidenceLayout === "reconstructed" && (
                       <span className="text-[10px] text-muted-foreground">
                         {t("review.reconstructedLayout")}
@@ -856,6 +808,10 @@ function ReviewRoomPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="px-3 pb-2.5 text-xs text-muted-foreground">
+                {t("review.clickToSeeProof")}
               </div>
             )}
           </div>
@@ -890,17 +846,13 @@ type Recommendation = {
 };
 
 function DecisionPanel({
-  runId, recommendation, counts, totalCount, blockers, supplierFilename, tenderPackHint, onPickBlocker,
+  runId, recommendation, counts, totalCount,
   staleness, reviewSigned,
 }: {
   runId: string;
   recommendation: Recommendation;
   counts: Record<Verdict, number>;
   totalCount: number;
-  blockers: Array<{ criterion: Criterion; finding: Finding | null }>;
-  supplierFilename: string | null;
-  tenderPackHint?: string | null;
-  onPickBlocker: (findingId: string) => void;
   staleness: Staleness;
   reviewSigned: boolean;
 }) {
@@ -935,13 +887,13 @@ function DecisionPanel({
   return (
     <aside className="border-b lg:border-b-0 bg-background min-h-0 flex flex-col">
       <ScrollArea className="flex-1">
-        <div className="p-5 space-y-6">
+        <div className="p-5 space-y-5">
           <div className={`relative overflow-hidden rounded-xl border ${kindTone.border} ${kindTone.bg} p-4`}>
             <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${kindTone.accent}`} />
             <div className="flex items-start justify-between gap-3 pl-1">
               <div className="min-w-0">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {t("review.recommendation")}
+                  {t("review.whatToDo")}
                 </div>
                 <div className={`mt-1.5 flex items-center gap-2 ${kindTone.text}`}>
                   <Icon className={cn("w-5 h-5 shrink-0", recommendation.kind === "pending" && "animate-spin")} />
@@ -951,96 +903,21 @@ function DecisionPanel({
               {recommendation.kind !== "pending" && (
               <div className="text-right shrink-0">
                 <div className="text-2xl font-semibold tabular-nums tracking-tight leading-none">{recommendation.score}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">{t("review.scoreOf")}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{t("review.alignmentScore")}</div>
               </div>
               )}
             </div>
             <p className="text-sm text-foreground/75 mt-2.5 leading-relaxed pl-1">{recommendation.reason}</p>
           </div>
 
-          {(supplierFilename || tenderPackHint) && (
-            <div className="space-y-2.5">
-              {tenderPackHint && (
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 h-7 w-7 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 grid place-items-center shrink-0">
-                    <FileText className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("runDetail.customer")}
-                    </div>
-                    <div className="text-xs text-foreground/90 leading-snug mt-0.5 break-all">{tenderPackHint}</div>
-                  </div>
-                </div>
-              )}
-              {supplierFilename && (
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 h-7 w-7 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 grid place-items-center shrink-0">
-                    <FileStack className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("runDetail.supplier")}
-                    </div>
-                    <div className="text-xs text-foreground/90 leading-snug mt-0.5 break-all">{supplierFilename}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2.5">
-              {t("review.coverage")}
+              {t("review.requirementsAtAGlance")}
             </div>
             <CoverageStack counts={counts} total={totalCount} t={t} />
           </div>
 
-          {blockers.length > 0 && (
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2.5">
-                {t("review.topBlockers")}
-              </div>
-              <div className="space-y-1">
-                {blockers.map((b) => {
-                  const v = toVerdict(b.finding?.severity);
-                  const tone = verdictTone[v];
-                  return (
-                    <button
-                      key={b.finding!.id}
-                      onClick={() => onPickBlocker(b.finding!.id)}
-                      className="w-full text-left rounded-lg px-2.5 py-2 hover:bg-muted/60 transition-colors"
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${tone.dot}`} />
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium leading-snug line-clamp-2">{b.criterion.name}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {expandCategory(b.criterion.category)}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4 border-t space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {t("review.nextSteps")}
-              </div>
-              <div className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground">
-                <span className={reviewSigned ? "text-ok font-medium" : nextStep === "review" ? "text-foreground font-medium" : ""}>1</span>
-                <span className="opacity-40">·</span>
-                <span className={reportViewed ? "text-ok font-medium" : nextStep === "report" ? "text-foreground font-medium" : ""}>2</span>
-                <span className="opacity-40">·</span>
-                <span className={canSign || nextStep === "sign" ? "text-foreground font-medium" : ""}>3</span>
-              </div>
-            </div>
-
+          <div className="pt-1 space-y-2">
             {nextStep === "review" && (
               <Button asChild className="w-full">
                 <Link to="/runs/$runId/review" params={{ runId }}>
@@ -1071,30 +948,6 @@ function DecisionPanel({
                 </Button>
               )
             )}
-
-            <div className="flex items-center gap-3 text-xs">
-              {nextStep !== "review" && (
-                <Link to="/runs/$runId/review" params={{ runId }} className="text-muted-foreground hover:text-foreground">
-                  {reviewSigned ? t("review.reopenChecklist") : t("review.openChecklist")}
-                </Link>
-              )}
-              {nextStep !== "report" && (
-                <Link
-                  to="/runs/$runId/report"
-                  params={{ runId }}
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={markReportViewed}
-                >
-                  {t("review.reportShort")}
-                </Link>
-              )}
-              {nextStep !== "sign" && (
-                <span className="text-muted-foreground/70 inline-flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  {t("review.decideAndSign")}
-                </span>
-              )}
-            </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">{gateReason}</p>
           </div>
         </div>
@@ -1182,11 +1035,6 @@ const EvidenceCard = React.forwardRef<
               {finding.justification}
             </p>
           )}
-          {finding?.evidence_quote && (
-            <blockquote className={cn("mt-2.5 border-l-2 pl-3 text-[12.5px] text-foreground/65 leading-relaxed line-clamp-2", tone.border)}>
-              “{finding.evidence_quote}”
-            </blockquote>
-          )}
           {!finding && (
             <div className="text-[12px] text-muted-foreground mt-1.5">
               {t("review.pending")}
@@ -1197,18 +1045,6 @@ const EvidenceCard = React.forwardRef<
     </button>
   );
 });
-
-function CountChip({ verdict, n }: { verdict: Verdict; n: number }) {
-  const { t } = useTranslation();
-  const tone = verdictTone[verdict];
-  return (
-    <div className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs ${tone.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
-      <span className="text-muted-foreground">{t(`verdict.${verdict === "not_addressed" ? "notAddressed" : verdict}`)}</span>
-      <span className="font-semibold tabular-nums">{n}</span>
-    </div>
-  );
-}
 
 function AgentTabs({
   groups, total, counts, activeCat, onSelect, t,
@@ -1272,8 +1108,8 @@ function AgentTabs({
         >
           <div className="flex items-stretch gap-1.5 min-w-max pr-4">
             <AgentTab
-              label={t("review.allAgents") ?? "All"}
-              shortLabel={t("review.allAgents") ?? "All"}
+              label={t("review.allTopics")}
+              shortLabel={t("review.allTopics")}
               total={total}
               counts={counts}
               selected={activeCat === "__all__"}
