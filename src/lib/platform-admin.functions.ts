@@ -20,9 +20,23 @@ export const listPlatformWaiting = createServerFn({ method: "POST" })
         i.created_at,
         i.expires_at,
         o.id AS organization_id,
-        o.name AS organization_name
+        o.name AS organization_name,
+        inviter.email AS invited_by_email,
+        ar.contact_name,
+        ar.note,
+        ar.created_at AS requested_at,
+        ar.decided_at AS approved_at
       FROM organization_invites i
       JOIN organizations o ON o.id = i.organization_id
+      LEFT JOIN users inviter ON inviter.id = i.invited_by
+      LEFT JOIN LATERAL (
+        SELECT contact_name, note, created_at, decided_at
+        FROM access_requests
+        WHERE lower(contact_email) = lower(i.email)
+          AND status = 'approved'
+        ORDER BY decided_at DESC NULLS LAST, created_at DESC
+        LIMIT 1
+      ) ar ON true
       WHERE i.accepted_at IS NULL
         AND i.revoked_at IS NULL
         AND i.expires_at > now()
@@ -38,6 +52,11 @@ export const listPlatformWaiting = createServerFn({ method: "POST" })
         expires_at: r.expires_at,
         organization_id: r.organization_id as string,
         organization_name: r.organization_name as string,
+        invited_by_email: (r.invited_by_email as string) ?? null,
+        contact_name: (r.contact_name as string) ?? "",
+        note: (r.note as string) ?? "",
+        requested_at: r.requested_at ?? null,
+        approved_at: r.approved_at ?? r.created_at,
       })),
     };
   });
@@ -66,7 +85,10 @@ export const listPlatformUsers = createServerFn({ method: "POST" })
       SELECT
         u.id, u.email, u.full_name, u.created_at, u.deactivated_at,
         p.display_name,
-        ur.role
+        ur.role,
+        (
+          SELECT max(s.created_at) FROM sessions s WHERE s.user_id = u.id
+        ) AS last_seen
       FROM users u
       LEFT JOIN profiles p ON p.id = u.id
       LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -125,6 +147,7 @@ export const listPlatformUsers = createServerFn({ method: "POST" })
       display_name: (r.display_name ?? r.full_name ?? r.email) as string,
       role: (r.role as string) ?? "reviewer",
       created_at: r.created_at,
+      last_seen: r.last_seen ?? null,
       deactivated: Boolean(r.deactivated_at),
       memberships: byUser.get(r.id as string) ?? [],
     }));
