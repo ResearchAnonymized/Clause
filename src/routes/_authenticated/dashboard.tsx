@@ -10,6 +10,7 @@ import {
   ChevronRight,
   FileSearch,
   FileStack,
+  Inbox,
   Loader2,
   Plus,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { GettingStartedCard } from "@/components/getting-started-card";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useCurrentWorkspace } from "@/hooks/use-workspace";
+import { useAuth, useRoles } from "@/hooks/use-auth";
 
 const dfLocale = (lang: string) => (lang.startsWith("fi") ? fiLocale : lang.startsWith("sv") ? svLocale : undefined);
 
@@ -34,6 +36,16 @@ function DashboardPage() {
   const loc = dfLocale(i18n.language);
   const { showChecklist, allDone } = useOnboarding();
   const { workspace } = useCurrentWorkspace();
+  const { user } = useAuth();
+  const { isAdmin } = useRoles(user?.id);
+  const { data: joinRequests = [] } = useQuery({
+    queryKey: ["admin", "access-requests"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { listAccessRequests } = await import("@/lib/access-requests.functions");
+      return listAccessRequests();
+    },
+  });
 
   const failedCutoffMs = Date.now() - 24 * 60 * 60 * 1000;
 
@@ -96,6 +108,26 @@ function DashboardPage() {
           </Link>
         </Button>
       </div>
+
+      {isAdmin && joinRequests.length > 0 && (
+        <Link
+          to="/admin"
+          className="flex items-center justify-between gap-3 rounded-xl border border-brand/25 bg-brand-soft px-4 py-3 hover:bg-brand-soft/80 transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="h-9 w-9 rounded-lg bg-brand text-brand-foreground grid place-items-center shrink-0">
+              <Inbox className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{t("dashboard.pendingRequestsTitle")}</div>
+              <p className="text-xs text-muted-foreground">
+                {t("dashboard.pendingRequestsBody", { count: joinRequests.length })}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+        </Link>
+      )}
 
       {showChecklist && allDone && <GettingStartedCard />}
 

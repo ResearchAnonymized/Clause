@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
@@ -8,6 +9,7 @@ import {
   Settings,
   Map,
   Plus,
+  Inbox,
 } from "lucide-react";
 
 import {
@@ -19,6 +21,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
@@ -29,6 +32,7 @@ import { PRODUCT_TOUR_STEPS } from "@/lib/product-tour";
 import { cn } from "@/lib/utils";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/config/instance";
 import { CounterpartGlyph } from "@/components/product-mark";
+import { useAuth, useRoles } from "@/hooks/use-auth";
 
 const itemsDef = [
   { key: "dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -44,6 +48,16 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const tour = useProductTourOptional();
+  const { user } = useAuth();
+  const { isAdmin } = useRoles(user?.id);
+  const { data: joinRequests = [] } = useQuery({
+    queryKey: ["admin", "access-requests"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { listAccessRequests } = await import("@/lib/access-requests.functions");
+      return listAccessRequests();
+    },
+  });
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   return (
@@ -112,6 +126,19 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActive("/admin")}>
+                    <Link to="/admin">
+                      <Inbox className="h-4 w-4" />
+                      {!collapsed && <span>{t("sidebar.requests")}</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                  {joinRequests.length > 0 ? (
+                    <SidebarMenuBadge>{joinRequests.length}</SidebarMenuBadge>
+                  ) : null}
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
