@@ -168,23 +168,31 @@ describe("access requests without email", () => {
     expect(Number(orgs[0].n)).toBe(0);
   });
 
-  it("refuses to approve a name that is already on the instance", async () => {
+  it("invites the contact into an existing organization", async () => {
     const sql = getSql();
     await submitAccessRequest({
       organizationName: orgName,
-      contactEmail: `again.${ownerEmail}`,
-      contactName: "Second Contact",
+      contactEmail: otherEmail,
+      contactName: "Access Other",
     });
     const rows = await sql`
-      SELECT id FROM access_requests
-      WHERE status = 'pending' AND organization_name = ${orgName}
+      SELECT id, organization_id FROM access_requests
+      WHERE status = 'pending' AND contact_email = ${otherEmail}
       LIMIT 1
     `;
-    await expect(
-      approveAccessRequest({
-        requestId: rows[0].id as string,
-        actorUserId: actorId,
-      }),
-    ).rejects.toThrow(/already on this instance/i);
+    expect(rows[0].organization_id).toBe(orgIds[0]);
+    const approved = await approveAccessRequest({
+      requestId: rows[0].id as string,
+      actorUserId: actorId,
+    });
+    expect(approved.kind).toBe("join");
+    expect(approved.organizationId).toBe(orgIds[0]);
+    const token = new URL(approved.acceptUrl).searchParams.get("token");
+    const joined = await acceptOrganizationInvite({
+      token: token!,
+      userId: otherId,
+      userEmail: otherEmail,
+    });
+    expect(joined.organizationId).toBe(orgIds[0]);
   });
 });

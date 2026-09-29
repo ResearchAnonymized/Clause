@@ -161,11 +161,12 @@ export async function createOrganizationInvite(opts: {
   workspaceIds?: string[];
   workspaceRole?: WorkspaceRole;
   allowOwnerInvite?: boolean;
+  skipMembershipCheck?: boolean;
 }): Promise<{ token: string; inviteId: string; expiresAt: Date }> {
   if (opts.role === "owner" && !opts.allowOwnerInvite) {
     throw new Error("Cannot invite as owner — transfer ownership instead");
   }
-  if (!opts.allowOwnerInvite) {
+  if (!opts.allowOwnerInvite && !opts.skipMembershipCheck) {
     await assertOrgMembership(opts.invitedBy, opts.organizationId, ["owner", "admin"]);
   }
 
@@ -300,7 +301,7 @@ export async function reissueOwnerInvite(opts: {
   const named = await sql`
     SELECT workspace_id FROM organization_invite_workspaces WHERE invite_id = ${row.id}
   `;
-  let workspaceIds = named.map((r: { workspace_id: string }) => r.workspace_id as string);
+  let workspaceIds = named.map((r: { workspace_id: string }) => r.workspace_id);
   if (!workspaceIds.length) {
     const ws = await sql`
       SELECT id FROM workspaces
@@ -330,32 +331,55 @@ export async function reissueOwnerInvite(opts: {
   return { acceptUrl: inviteAcceptUrl(invite.token), email: row.email as string };
 }
 
-export async function acceptOrganizationInvite(opts: {
-  token: string;
-  userId: string;
-  userEmail: string;
-}): Promise<{ organizationId: string; workspaceId: string | null }> {
-  const sql = getSql();
-  const tokenHash = hashInviteToken(parseInviteInput(opts.token));
-  const invites = await sql`
-    SELECT id, organization_id, email, role, expires_at, accepted_at, revoked_at
-    FROM organization_invites
-    WHERE token_hash = ${tokenHash}
-    LIMIT 1
-  `;
-  const invite = invites[0];
+type InviteRecord = {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: string;
+  workspace_role?: string | null;
+  expires_at: Date | string;
+  accepted_at: Date | string | null;
+  revoked_at: Date | string | null;
+};
+
+function assertInviteOpen(invite: InviteRecord | undefined): asserts invite is InviteRecord {
   if (!invite) throw new Error("Invite not found");
   if (invite.accepted_at) throw new Error("Invite already accepted");
   if (invite.revoked_at) throw new Error("Invite was revoked");
   if (new Date(invite.expires_at) < new Date()) throw new Error("Invite expired");
+}
 
+export async function findPendingInviteByEmail(email: string): Promise<InviteRecord | null> {
+  const sql = getSql();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const rows = await sql`
+    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at
+    FROM organization_invites
+    WHERE lower(email) = ${normalized}
+      AND accepted_at IS NULL
+      AND revoked_at IS NULL
+      AND expires_at > now()
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return (rows[0] as InviteRecord | undefined) ?? null;
+}
+
+async function applyOrganizationInvite(opts: {
+  invite: InviteRecord;
+  userId: string;
+  userEmail: string;
+}): Promise<{ organizationId: string; workspaceId: string | null }> {
+  const sql = getSql();
+  const invite = opts.invite;
   const inviteEmail = String(invite.email).trim().toLowerCase();
   const userEmail = opts.userEmail.trim().toLowerCase();
   if (inviteEmail !== userEmail) {
     throw new Error("Sign in with the invited email address to accept");
   }
 
-  const organizationId = invite.organization_id as string;
+  const organizationId = invite.organization_id;
   const role = invite.role as OrganizationRole;
   const named = await sql`
     SELECT workspace_id, workspace_role
@@ -365,10 +389,12 @@ export async function acceptOrganizationInvite(opts: {
   const fallbackRole = (invite.workspace_role as WorkspaceRole | null)
     ?? (role === "owner" ? "owner" : role === "admin" ? "admin" : "reviewer");
 
-  let targets: { workspace_id: string; workspace_role: WorkspaceRole }[] = named.map((r: any) => ({
-    workspace_id: r.workspace_id as string,
-    workspace_role: (r.workspace_role as WorkspaceRole) ?? fallbackRole,
-  }));
+  let targets: { workspace_id: string; workspace_role: WorkspaceRole }[] = named.map(
+    (r: { workspace_id: string; workspace_role?: WorkspaceRole | null }) => ({
+      workspace_id: r.workspace_id,
+      workspace_role: r.workspace_role ?? fallbackRole,
+    }),
+  );
   if (!targets.length) {
     const workspaces = await sql`
       SELECT id FROM workspaces
@@ -435,6 +461,34 @@ export async function acceptOrganizationInvite(opts: {
   });
 
   return { organizationId, workspaceId };
+}
+
+export async function acceptOrganizationInvite(opts: {
+  token: string;
+  userId: string;
+  userEmail: string;
+}): Promise<{ organizationId: string; workspaceId: string | null }> {
+  const sql = getSql();
+  const tokenHash = hashInviteToken(parseInviteInput(opts.token));
+  const invites = await sql`
+    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at
+    FROM organization_invites
+    WHERE token_hash = ${tokenHash}
+    LIMIT 1
+  `;
+  const invite = invites[0] as InviteRecord | undefined;
+  assertInviteOpen(invite);
+  return applyOrganizationInvite({ invite, userId: opts.userId, userEmail: opts.userEmail });
+}
+
+/** Join the latest pending invite for this work email. No token required. */
+export async function acceptPendingInviteForUser(opts: {
+  userId: string;
+  userEmail: string;
+}): Promise<{ organizationId: string; workspaceId: string | null } | null> {
+  const invite = await findPendingInviteByEmail(opts.userEmail);
+  if (!invite) return null;
+  return applyOrganizationInvite({ invite, userId: opts.userId, userEmail: opts.userEmail });
 }
 
 /** Ensure workspace belongs to an org the user is a member of. */

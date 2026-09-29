@@ -19,7 +19,7 @@ import { recordAuthEvent } from "@/lib/auth/events";
 import { mailConfigured, sendMail } from "@/lib/mailer.server";
 import { PRODUCT_NAME } from "@/config/instance";
 import { getSql } from "@/db/pool";
-import { hashInviteToken } from "@/lib/organizations.server";
+import { findPendingInviteByEmail, hashInviteToken } from "@/lib/organizations.server";
 import { looksLikeInviteToken, parseInviteInput } from "@/lib/organizations";
 
 function json(data: unknown, init: ResponseInit = {}) {
@@ -134,6 +134,12 @@ export const Route = createFileRoute("/api/auth")({
                 await recordAuthEvent({ event: "login_fail", email: body.email, ip });
                 return json({ error: { message: "Invalid email or password" } }, { status: 401 });
               }
+              try {
+                const { acceptPendingInviteForUser } = await import("@/lib/organizations.server");
+                await acceptPendingInviteForUser({ userId: user.id, userEmail: user.email });
+              } catch {
+                /* sign-in still succeeds if the invite cannot be applied */
+              }
               const { token, expiresAt } = await createSession(user.id);
               await recordAuthEvent({ event: "login_ok", userId: user.id, email: user.email, ip });
               const session = {
@@ -157,14 +163,21 @@ export const Route = createFileRoute("/api/auth")({
             }
             const access = await accessState();
             const inviteToken = parseInviteInput(String(body.inviteToken ?? ""));
-            if (access.signupOff && !inviteToken) {
+            const pendingInvite = inviteToken ? null : await findPendingInviteByEmail(body.email);
+            const joiningByInvite = Boolean(inviteToken || pendingInvite);
+            if (access.signupOff && !joiningByInvite) {
               await recordAuthEvent({ event: "signup_denied", email: body.email, ip, meta: { reason: "off" } });
               return json({ error: { message: "New accounts are disabled on this instance" } }, { status: 403 });
             }
-            if (access.inviteRequired && !inviteToken) {
+            if (access.inviteRequired && !joiningByInvite) {
               await recordAuthEvent({ event: "signup_denied", email: body.email, ip, meta: { reason: "invite" } });
               return json(
-                { error: { message: "This instance is invite-only. Ask an organization admin to invite your work email, then paste that invite link here." } },
+                {
+                  error: {
+                    message:
+                      "This work email has not been approved yet. Request access, wait for an admin to approve, then create an account with that same email. No join link is needed.",
+                  },
+                },
                 { status: 403 },
               );
             }
@@ -215,8 +228,8 @@ export const Route = createFileRoute("/api/auth")({
               email: body.email,
               password: body.password,
               fullName: body.fullName,
-              organizationName: inviteToken ? undefined : body.organizationName,
-              organizationKind: inviteToken ? undefined : body.organizationKind,
+              organizationName: joiningByInvite ? undefined : body.organizationName,
+              organizationKind: joiningByInvite ? undefined : body.organizationKind,
               inviteToken: inviteToken || undefined,
             });
             const { token, expiresAt } = await createSession(user.id);
@@ -225,7 +238,7 @@ export const Route = createFileRoute("/api/auth")({
               userId: user.id,
               email: user.email,
               ip,
-              meta: { invite: Boolean(inviteToken), bootstrap: access.bootstrap },
+              meta: { invite: joiningByInvite, bootstrap: access.bootstrap },
             });
             const session = {
               access_token: token,

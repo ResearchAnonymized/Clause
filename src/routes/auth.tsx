@@ -43,6 +43,7 @@ function AuthPage() {
   const [orgName, setOrgName] = useState("");
   const [inviteToken, setInviteToken] = useState(parseInviteInput(invite ?? ""));
   const [inviteEmail, setInviteEmail] = useState<string | null>(null);
+  const [showInviteField, setShowInviteField] = useState(false);
   const [access, setAccess] = useState<{
     bootstrap: boolean;
     canSignUp: boolean;
@@ -252,21 +253,11 @@ function AuthPage() {
                   {(access?.inviteRequired || inviteToken) && !access?.bootstrap && (
                     <p className="text-xs text-muted-foreground">{t("auth.inviteOnly")}</p>
                   )}
-                  {(access?.inviteRequired || inviteToken) && !access?.bootstrap && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="invite">{t("auth.inviteToken")}</Label>
-                      <Input
-                        id="invite"
-                        value={inviteToken}
-                        onChange={(e) => setInviteToken(e.target.value)}
-                        placeholder={t("auth.invitePlaceholder")}
-                        autoComplete="off"
-                        spellCheck={false}
-                        required={!access?.canSignUp}
-                      />
-                      <p className="text-[11px] text-muted-foreground">{t("auth.inviteHint")}</p>
-                    </div>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email2">{t("auth.email")}</Label>
+                    <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    {inviteEmail && <p className="text-[11px] text-muted-foreground">{t("auth.inviteFor", { email: inviteEmail })}</p>}
+                  </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="name">{t("auth.fullName")}</Label>
                     <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
@@ -289,19 +280,38 @@ function AuthPage() {
                     </>
                   )}
                   <div className="space-y-1.5">
-                    <Label htmlFor="email2">{t("auth.email")}</Label>
-                    <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                    {inviteEmail && <p className="text-[11px] text-muted-foreground">{t("auth.inviteFor", { email: inviteEmail })}</p>}
-                  </div>
-                  <div className="space-y-1.5">
                     <Label htmlFor="password2">{t("auth.password")}</Label>
                     <Input id="password2" type="password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />
                     <p className="text-[11px] text-muted-foreground">{t("auth.passwordHint")}</p>
                   </div>
+                  {(access?.inviteRequired || access?.signupOff || inviteToken) && !access?.bootstrap && (
+                    showInviteField ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="invite">{t("auth.inviteToken")}</Label>
+                        <Input
+                          id="invite"
+                          value={inviteToken}
+                          onChange={(e) => setInviteToken(e.target.value)}
+                          placeholder={t("auth.invitePlaceholder")}
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                        <p className="text-[11px] text-muted-foreground">{t("auth.inviteHint")}</p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:underline"
+                        onClick={() => setShowInviteField(true)}
+                      >
+                        {t("auth.inviteLinkToggle")}
+                      </button>
+                    )
+                  )}
                   <Button type="submit" className="w-full" disabled={busy}>{t("auth.createAccount")}</Button>
                   {access?.bootstrap ? (
                     <p className="text-xs text-muted-foreground text-center">{t("auth.firstAdmin")}</p>
-                  ) : access?.inviteRequired && !inviteToken ? (
+                  ) : access?.inviteRequired ? (
                     <p className="text-xs text-muted-foreground text-center">
                       <Link to="/request" className="hover:underline">{t("auth.requestAccessHint")}</Link>
                     </p>

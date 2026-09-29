@@ -192,8 +192,10 @@ export async function provisionNewUser(opts: {
     ON CONFLICT DO NOTHING
   `;
 
+  const { acceptOrganizationInvite, acceptPendingInviteForUser } = await import(
+    "@/lib/organizations.server"
+  );
   if (opts.inviteToken) {
-    const { acceptOrganizationInvite } = await import("@/lib/organizations.server");
     await acceptOrganizationInvite({
       token: opts.inviteToken,
       userId: user.id,
@@ -201,6 +203,9 @@ export async function provisionNewUser(opts: {
     });
     return toAuthUser(user);
   }
+
+  const joined = await acceptPendingInviteForUser({ userId: user.id, userEmail: email });
+  if (joined) return toAuthUser(user);
 
   const kind = opts.organizationKind ?? (opts.organizationName ? "company" : "personal");
   const orgName =

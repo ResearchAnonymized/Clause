@@ -240,7 +240,12 @@ function AdminPage() {
                 <TableBody>
                   {requests.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.organization_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{r.organization_name}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {r.existingOrganization ? t("adminPage.requestJoinExisting") : t("adminPage.requestNewOrg")}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm">
                         <div>{r.contact_name}</div>
                         <div className="text-xs text-muted-foreground">{r.contact_email}</div>

@@ -27,14 +27,12 @@ export function ownerInviteMail(opts: {
   return {
     subject: `Join ${opts.orgName} on ${opts.product}`,
     text: [
-      `You have been named the responsible person for ${opts.orgName} on ${opts.product}.`,
+        `You have been named the responsible person for ${opts.orgName} on ${opts.product}.`,
       ``,
-      `Join in the usual way:`,
-      `1. Open this invite: ${opts.acceptUrl}`,
-      `2. Create an account or sign in with ${opts.email}`,
-      `3. Join the organization. You can then invite your colleagues.`,
+      `Create an account or sign in with ${opts.email} — that same work email is enough to join. You do not need to paste a link.`,
       ``,
-      `This link expires in 14 days.`,
+      `Optional join link (expires in 14 days):`,
+      opts.acceptUrl,
     ].join("\n"),
   };
 }
@@ -51,12 +49,10 @@ export function colleagueInviteMail(opts: {
     text: [
       `You have been invited to${where} ${opts.product}.`,
       ``,
-      `Join in the usual way:`,
-      `1. Open this invite: ${opts.acceptUrl}`,
-      `2. Create an account or sign in with ${opts.email}`,
-      `3. Join the organization.`,
+      `Create an account or sign in with ${opts.email} — that same work email is enough to join. You do not need to paste a link.`,
       ``,
-      `This link expires in 14 days.`,
+      `Optional join link (expires in 14 days):`,
+      opts.acceptUrl,
     ].join("\n"),
   };
 }

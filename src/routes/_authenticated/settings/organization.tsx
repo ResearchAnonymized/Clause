@@ -65,12 +65,22 @@ function OrganizationSettingsPage() {
     },
   });
 
-  const { data: audit = [] } = useQuery({
+  const auditQuery = useQuery({
     queryKey: ["org-audit", organizationId],
     enabled: !!organizationId && canManage,
     queryFn: async () => {
       const { listOrganizationAudit } = await import("@/lib/organizations.functions");
       return listOrganizationAudit({ data: { organizationId: organizationId! } });
+    },
+  });
+  const audit = auditQuery.data ?? [];
+
+  const { data: joinRequests = [] } = useQuery({
+    queryKey: ["org-join-requests", organizationId],
+    enabled: !!organizationId && canManage,
+    queryFn: async () => {
+      const { listOrganizationJoinRequests } = await import("@/lib/access-requests.functions");
+      return listOrganizationJoinRequests({ data: { organizationId: organizationId! } });
     },
   });
 
@@ -137,6 +147,38 @@ function OrganizationSettingsPage() {
     if (!lastInviteUrl) return;
     await navigator.clipboard.writeText(lastInviteUrl);
     toast.success(t("peoplePage.copyLink"));
+  };
+
+  const approveJoin = async (requestId: string) => {
+    if (!organizationId) return;
+    setBusy(true);
+    try {
+      const { approveOrganizationJoinRequest } = await import("@/lib/access-requests.functions");
+      await approveOrganizationJoinRequest({ data: { organizationId, requestId } });
+      toast.success(t("peoplePage.joinApproved"));
+      qc.invalidateQueries({ queryKey: ["org-join-requests", organizationId] });
+      qc.invalidateQueries({ queryKey: ["org-invites", organizationId] });
+      qc.invalidateQueries({ queryKey: ["org-audit", organizationId] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not approve request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rejectJoin = async (requestId: string) => {
+    if (!organizationId) return;
+    setBusy(true);
+    try {
+      const { rejectOrganizationJoinRequest } = await import("@/lib/access-requests.functions");
+      await rejectOrganizationJoinRequest({ data: { organizationId, requestId } });
+      toast.success(t("adminPage.requestRejected"));
+      qc.invalidateQueries({ queryKey: ["org-join-requests", organizationId] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not reject request");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const revoke = async (inviteId: string) => {
@@ -251,6 +293,38 @@ function OrganizationSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {canManage && (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("peoplePage.joinRequestsTitle")}</CardTitle>
+          <CardDescription>{t("peoplePage.joinRequestsLead")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {joinRequests.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("peoplePage.joinEmpty")}</p>
+          ) : (
+            joinRequests.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3 last:border-0 last:pb-0">
+                <div>
+                  <p className="text-sm font-medium">{r.contact_name}</p>
+                  <p className="text-xs text-muted-foreground">{r.contact_email}</p>
+                  {r.note ? <p className="text-xs text-muted-foreground mt-1">{r.note}</p> : null}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={busy} onClick={() => void approveJoin(r.id)}>
+                    {t("adminPage.approve")}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => void rejectJoin(r.id)}>
+                    {t("adminPage.reject")}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+      )}
 
       <Card>
         <CardHeader>

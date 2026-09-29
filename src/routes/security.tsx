@@ -23,7 +23,7 @@ export const Route = createFileRoute("/security")({
     >
       <h2>Access &amp; authentication</h2>
       <ul>
-        <li>Email + password sign-in with hashed credentials. New accounts are invite-only after the first operator is created.</li>
+        <li>Email + password sign-in with hashed credentials. After the first operator, new accounts need an organization invite — use that work email; a join link is optional.</li>
         <li>
           Three role layers: <strong>platform</strong> (instance operators), <strong>organization</strong>{" "}
           (owner / org admin / member), and <strong>workspace</strong> (owner / admin / reviewer / viewer).

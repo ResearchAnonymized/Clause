@@ -15,7 +15,7 @@ describe("invite mail", () => {
     expect(mail.subject).toContain("North Shore Counsel");
     expect(mail.text).toContain(url);
     expect(mail.text).toMatch(/Create an account or sign in with owner@firm\.fi/);
-    expect(mail.text).toMatch(/Join the organization/);
+    expect(mail.text).toMatch(/do not need to paste a link/);
   });
 
   it("uses the same join steps for colleagues", () => {
@@ -28,6 +28,7 @@ describe("invite mail", () => {
     });
     expect(mail.text).toContain(url);
     expect(mail.text).toMatch(/Create an account or sign in/);
+    expect(mail.text).toMatch(/do not need to paste a link/);
   });
 
   it("logs instead of sending when SMTP is not configured", async () => {

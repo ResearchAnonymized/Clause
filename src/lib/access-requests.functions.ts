@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requirePlatformAdmin } from "@/integrations/supabase/auth-middleware";
+import { requirePlatformAdmin, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { callerIp } from "@/lib/rate-limit.server";
 import {
   approveAccessRequest,
   listPendingAccessRequests,
+  listPendingJoinRequestsForOrganization,
   rejectAccessRequest,
   submitAccessRequest,
 } from "@/lib/access-requests.server";
@@ -54,6 +55,56 @@ export const approveAccessRequestFn = createServerFn({ method: "POST" })
       requestId: data.requestId,
       actorUserId: userId,
       workspaceName: data.workspaceName,
+    });
+  });
+
+const OrgRequest = z.object({
+  organizationId: z.string().uuid(),
+});
+
+export const listOrganizationJoinRequests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => OrgRequest.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    const { assertOrgMembership } = await import("@/lib/organizations.server");
+    await assertOrgMembership(userId, data.organizationId, ["owner", "admin"]);
+    return listPendingJoinRequestsForOrganization(data.organizationId);
+  });
+
+const OrgApprove = z.object({
+  organizationId: z.string().uuid(),
+  requestId: z.string().uuid(),
+});
+
+export const approveOrganizationJoinRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => OrgApprove.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    return approveAccessRequest({
+      requestId: data.requestId,
+      actorUserId: userId,
+      asOrganizationId: data.organizationId,
+    });
+  });
+
+const OrgReject = z.object({
+  organizationId: z.string().uuid(),
+  requestId: z.string().uuid(),
+  reason: z.string().max(300).optional(),
+});
+
+export const rejectOrganizationJoinRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => OrgReject.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as { userId: string };
+    return rejectAccessRequest({
+      requestId: data.requestId,
+      actorUserId: userId,
+      reason: data.reason,
+      asOrganizationId: data.organizationId,
     });
   });
 

@@ -17,7 +17,7 @@ export const Route = createFileRoute("/request")({
       { title: `Request access — ${PRODUCT_NAME}` },
       {
         name: "description",
-        content: `Request an organization on ${PRODUCT_NAME}. GPT-Lab reviews each request and sends a join link if approved.`,
+        content: `Request access to ${PRODUCT_NAME}. An admin reviews each request. After approval, create an account with the same work email.`,
       },
     ],
   }),
@@ -74,6 +74,11 @@ function RequestAccessPage() {
                 <p className="text-sm font-medium">{t("requestPage.submittedTitle")}</p>
                 <p className="text-sm text-muted-foreground">{t("requestPage.submittedBody")}</p>
                 <Button asChild className="w-full">
+                  <Link to="/auth" search={{ tab: "signup" }}>
+                    {t("auth.signUp")}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
                   <Link to="/auth" search={{ tab: "signin" }}>
                     {t("nav.signIn")}
                   </Link>
