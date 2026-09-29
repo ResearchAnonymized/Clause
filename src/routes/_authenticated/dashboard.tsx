@@ -38,14 +38,15 @@ function DashboardPage() {
   const { workspace } = useCurrentWorkspace();
   const { user } = useAuth();
   const { isAdmin } = useRoles(user?.id);
-  const { data: joinRequests = [] } = useQuery({
-    queryKey: ["admin", "access-requests"],
+  const { data: waiting } = useQuery({
+    queryKey: ["admin", "waiting"],
     enabled: isAdmin,
     queryFn: async () => {
-      const { listAccessRequests } = await import("@/lib/access-requests.functions");
-      return listAccessRequests();
+      const { listPlatformWaiting } = await import("@/lib/platform-admin.functions");
+      return listPlatformWaiting();
     },
   });
+  const waitingCount = (waiting?.requests.length ?? 0) + (waiting?.pendingAccounts.length ?? 0);
 
   const failedCutoffMs = Date.now() - 24 * 60 * 60 * 1000;
 
@@ -109,7 +110,7 @@ function DashboardPage() {
         </Button>
       </div>
 
-      {isAdmin && joinRequests.length > 0 && (
+      {isAdmin && waitingCount > 0 && (
         <Link
           to="/admin"
           className="flex items-center justify-between gap-3 rounded-xl border border-brand/25 bg-brand-soft px-4 py-3 hover:bg-brand-soft/80 transition-colors"
@@ -121,7 +122,7 @@ function DashboardPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">{t("dashboard.pendingRequestsTitle")}</div>
               <p className="text-xs text-muted-foreground">
-                {t("dashboard.pendingRequestsBody", { count: joinRequests.length })}
+                {t("dashboard.pendingRequestsBody", { count: waitingCount })}
               </p>
             </div>
           </div>

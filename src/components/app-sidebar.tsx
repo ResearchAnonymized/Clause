@@ -50,14 +50,15 @@ export function AppSidebar() {
   const tour = useProductTourOptional();
   const { user } = useAuth();
   const { isAdmin } = useRoles(user?.id);
-  const { data: joinRequests = [] } = useQuery({
-    queryKey: ["admin", "access-requests"],
+  const { data: waiting } = useQuery({
+    queryKey: ["admin", "waiting"],
     enabled: isAdmin,
     queryFn: async () => {
-      const { listAccessRequests } = await import("@/lib/access-requests.functions");
-      return listAccessRequests();
+      const { listPlatformWaiting } = await import("@/lib/platform-admin.functions");
+      return listPlatformWaiting();
     },
   });
+  const waitingCount = (waiting?.requests.length ?? 0) + (waiting?.pendingAccounts.length ?? 0);
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   return (
@@ -134,8 +135,8 @@ export function AppSidebar() {
                       {!collapsed && <span>{t("sidebar.requests")}</span>}
                     </Link>
                   </SidebarMenuButton>
-                  {joinRequests.length > 0 ? (
-                    <SidebarMenuBadge>{joinRequests.length}</SidebarMenuBadge>
+                  {waitingCount > 0 ? (
+                    <SidebarMenuBadge>{waitingCount}</SidebarMenuBadge>
                   ) : null}
                 </SidebarMenuItem>
               )}
