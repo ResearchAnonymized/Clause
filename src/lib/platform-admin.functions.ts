@@ -3,9 +3,13 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/integrations/supabase/auth-middleware";
 import { getSql } from "@/db/pool";
 import { recordAuthEvent } from "@/lib/auth/events";
-import { destroyAllSessions } from "@/lib/auth/session";
+import { destroyAllSessions, issueAuthToken } from "@/lib/auth/session";
+import { mailConfigured, passwordResetUrl } from "@/lib/mailer.server";
 import { listPendingAccessRequests } from "@/lib/access-requests.server";
 import { provisionOrganizationForOwnerInvite, reissueOwnerInvite } from "@/lib/organizations.server";
+import { rolesFromSaas, saasRoleFromMembership, type SaasOrgRole } from "@/lib/saas-roles";
+
+export type { SaasOrgRole };
 
 export const listPlatformWaiting = createServerFn({ method: "POST" })
   .middleware([requirePlatformAdmin])
@@ -17,6 +21,8 @@ export const listPlatformWaiting = createServerFn({ method: "POST" })
         i.id,
         i.email,
         i.role,
+        i.workspace_role,
+        i.grant_platform_admin,
         i.created_at,
         i.expires_at,
         o.id AS organization_id,
@@ -44,10 +50,13 @@ export const listPlatformWaiting = createServerFn({ method: "POST" })
     `;
     return {
       requests,
+      mailConfigured: mailConfigured(),
       pendingAccounts: rows.map((r: any) => ({
         id: r.id as string,
         email: r.email as string,
         role: r.role as string,
+        saas_role: saasRoleFromMembership(String(r.role), (r.workspace_role as string | null) ?? null),
+        grant_platform_admin: Boolean(r.grant_platform_admin),
         created_at: r.created_at,
         expires_at: r.expires_at,
         organization_id: r.organization_id as string,
@@ -60,22 +69,6 @@ export const listPlatformWaiting = createServerFn({ method: "POST" })
       })),
     };
   });
-
-export type SaasOrgRole = "owner" | "admin" | "reviewer" | "viewer";
-
-function saasRoleFromMembership(orgRole: string, workspaceRole: string | null): SaasOrgRole {
-  if (orgRole === "owner") return "owner";
-  if (orgRole === "admin") return "admin";
-  if (workspaceRole === "viewer") return "viewer";
-  return "reviewer";
-}
-
-function rolesFromSaas(role: SaasOrgRole): { orgRole: "owner" | "admin" | "member"; workspaceRole: "owner" | "admin" | "reviewer" | "viewer" } {
-  if (role === "owner") return { orgRole: "owner", workspaceRole: "owner" };
-  if (role === "admin") return { orgRole: "admin", workspaceRole: "admin" };
-  if (role === "viewer") return { orgRole: "member", workspaceRole: "viewer" };
-  return { orgRole: "member", workspaceRole: "reviewer" };
-}
 
 export const listPlatformUsers = createServerFn({ method: "POST" })
   .middleware([requirePlatformAdmin])
@@ -261,6 +254,61 @@ export const setUserDeactivated = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const TargetUser = z.object({
+  userId: z.string().uuid(),
+});
+
+export const issuePasswordResetLink = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => TargetUser.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId: actorId } = context as { userId: string };
+    if (data.userId === actorId) {
+      throw new Error("Use Forgot password on the sign-in page for your own account.");
+    }
+    const sql = getSql();
+    const rows = await sql`
+      SELECT id, email, deactivated_at FROM users WHERE id = ${data.userId} LIMIT 1
+    `;
+    if (!rows[0]) throw new Error("User not found.");
+    if (rows[0].deactivated_at) {
+      throw new Error("Reactivate the account before issuing a reset link.");
+    }
+    const email = String(rows[0].email);
+    const token = await issueAuthToken({
+      purpose: "reset",
+      userId: data.userId,
+      email,
+      hours: 2,
+    });
+    await recordAuthEvent({
+      event: "password_reset_request",
+      userId: data.userId,
+      email,
+      meta: { by: "platform_admin", actor: actorId },
+    });
+    return { url: passwordResetUrl(token), expiresInHours: 2 };
+  });
+
+export const signOutUserSessions = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => TargetUser.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId: actorId } = context as { userId: string };
+    if (data.userId === actorId) throw new Error("You cannot sign out your own sessions here.");
+    const sql = getSql();
+    const rows = await sql`SELECT email FROM users WHERE id = ${data.userId} LIMIT 1`;
+    if (!rows[0]) throw new Error("User not found.");
+    await destroyAllSessions(data.userId);
+    await recordAuthEvent({
+      event: "session_revoke",
+      userId: data.userId,
+      email: String(rows[0].email),
+      meta: { by: "platform_admin", actor: actorId },
+    });
+    return { ok: true };
+  });
+
 export const listPlatformOrganizations = createServerFn({ method: "POST" })
   .middleware([requirePlatformAdmin])
   .handler(async () => {
@@ -352,4 +400,86 @@ export const reissueOwnerInviteLink = createServerFn({ method: "POST" })
       organizationId: data.organizationId,
       actorUserId: userId,
     });
+  });
+
+const PendingInvite = z.object({
+  inviteId: z.string().uuid(),
+  role: z.enum(["owner", "admin", "reviewer", "viewer"]),
+  grantPlatformAdmin: z.boolean(),
+});
+
+export const setPendingInviteRole = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => PendingInvite.parse(data))
+  .handler(async ({ data, context }) => {
+    const { userId: actorId } = context as { userId: string };
+    const sql = getSql();
+    const rows = await sql`
+      SELECT id, organization_id, email, accepted_at, revoked_at
+      FROM organization_invites
+      WHERE id = ${data.inviteId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row || row.accepted_at || row.revoked_at) {
+      throw new Error("This invite is no longer open.");
+    }
+    const { orgRole, workspaceRole } = rolesFromSaas(data.role);
+    await sql`
+      UPDATE organization_invites
+      SET role = ${orgRole}::organization_role,
+          workspace_role = ${workspaceRole}::workspace_role,
+          grant_platform_admin = ${data.grantPlatformAdmin}
+      WHERE id = ${data.inviteId}
+    `;
+    await sql`
+      UPDATE organization_invite_workspaces
+      SET workspace_role = ${workspaceRole}::workspace_role
+      WHERE invite_id = ${data.inviteId}
+    `;
+    const { recordOrgAudit } = await import("@/lib/organizations.server");
+    await recordOrgAudit({
+      organizationId: row.organization_id as string,
+      actorUserId: actorId,
+      event: "invite_role_changed",
+      targetEmail: String(row.email),
+      meta: { role: data.role, grantPlatformAdmin: data.grantPlatformAdmin },
+    });
+    return { ok: true };
+  });
+
+const ResendInvite = z.object({
+  inviteId: z.string().uuid(),
+});
+
+export const resendPendingAccountEmail = createServerFn({ method: "POST" })
+  .middleware([requirePlatformAdmin])
+  .inputValidator((data: unknown) => ResendInvite.parse(data))
+  .handler(async ({ data }) => {
+    const sql = getSql();
+    const rows = await sql`
+      SELECT i.email, i.role, i.workspace_role, o.name AS organization_name
+      FROM organization_invites i
+      JOIN organizations o ON o.id = i.organization_id
+      WHERE i.id = ${data.inviteId}
+        AND i.accepted_at IS NULL
+        AND i.revoked_at IS NULL
+        AND i.expires_at > now()
+      LIMIT 1
+    `;
+    if (!rows[0]) throw new Error("This person is no longer waiting to join.");
+    const { accessApprovedMail, createAccountUrl, sendMail } = await import("@/lib/mailer.server");
+    const { PRODUCT_NAME } = await import("@/config/instance");
+    const { saasRoleFromMembership, saasRoleLabelEn } = await import("@/lib/saas-roles");
+    const email = String(rows[0].email);
+    const saas = saasRoleFromMembership(String(rows[0].role), (rows[0].workspace_role as string | null) ?? null);
+    const mail = accessApprovedMail({
+      product: PRODUCT_NAME,
+      orgName: String(rows[0].organization_name),
+      email,
+      roleLabel: saasRoleLabelEn(saas),
+      acceptUrl: createAccountUrl(),
+    });
+    const sent = await sendMail({ to: email, subject: mail.subject, text: mail.text });
+    return { emailed: sent.delivered };
   });

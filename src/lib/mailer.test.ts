@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { colleagueInviteMail, inviteAcceptUrl, mailConfigured, ownerInviteMail, sendMail } from "@/lib/mailer.server";
+import { accessApprovedMail, colleagueInviteMail, inviteAcceptUrl, mailConfigured, ownerInviteMail, sendMail } from "@/lib/mailer.server";
 
 describe("invite mail", () => {
   it("sends owners through the standard accept link", () => {
@@ -14,8 +14,9 @@ describe("invite mail", () => {
     });
     expect(mail.subject).toContain("North Shore Counsel");
     expect(mail.text).toContain(url);
-    expect(mail.text).toMatch(/Create an account or sign in with owner@firm\.fi/);
-    expect(mail.text).toMatch(/do not need to paste a link/);
+    expect(mail.text).toMatch(/Create an account at:/);
+    expect(mail.text).toMatch(/Use this work email: owner@firm\.fi/);
+    expect(mail.text).toMatch(/do not need to paste a join link/);
   });
 
   it("uses the same join steps for colleagues", () => {
@@ -27,8 +28,23 @@ describe("invite mail", () => {
       acceptUrl: url,
     });
     expect(mail.text).toContain(url);
-    expect(mail.text).toMatch(/Create an account or sign in/);
-    expect(mail.text).toMatch(/do not need to paste a link/);
+    expect(mail.text).toMatch(/Create an account at:/);
+    expect(mail.text).toMatch(/Use this work email: reviewer@firm\.fi/);
+    expect(mail.text).toMatch(/do not need to paste a join link/);
+  });
+
+  it("uses the same create-account steps after approval", () => {
+    const url = inviteAcceptUrl("c".repeat(64));
+    const mail = accessApprovedMail({
+      product: "Counterpart",
+      orgName: "TUNI",
+      email: "mika@tuni.fi",
+      roleLabel: "Owner",
+      acceptUrl: url,
+    });
+    expect(mail.subject).toContain("TUNI");
+    expect(mail.text).toContain("/auth?tab=signup");
+    expect(mail.text).toContain("Owner");
   });
 
   it("logs instead of sending when SMTP is not configured", async () => {

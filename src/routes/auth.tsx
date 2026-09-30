@@ -213,7 +213,7 @@ function AuthPage() {
                 {canMail === false && (
                   <p className="text-xs text-muted-foreground">{t("auth.resetUnavailable")}</p>
                 )}
-                <Button type="submit" className="w-full" disabled={busy || canMail === false}>
+                <Button type="submit" className="w-full" disabled={busy}>
                   {t("auth.sendReset")}
                 </Button>
                 {resetSent && (

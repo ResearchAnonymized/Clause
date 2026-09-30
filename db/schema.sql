@@ -87,6 +87,7 @@ CREATE TABLE public.organization_invites (
   expires_at TIMESTAMPTZ NOT NULL,
   accepted_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
+  grant_platform_admin BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX organization_invites_org_idx ON public.organization_invites (organization_id);

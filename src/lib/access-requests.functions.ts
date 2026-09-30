@@ -44,6 +44,8 @@ export const listAccessRequests = createServerFn({ method: "POST" })
 const Approve = z.object({
   requestId: z.string().uuid(),
   workspaceName: z.string().min(1).max(120).optional(),
+  role: z.enum(["owner", "admin", "reviewer", "viewer"]).optional(),
+  grantPlatformAdmin: z.boolean().optional(),
 });
 
 export const approveAccessRequestFn = createServerFn({ method: "POST" })
@@ -55,6 +57,8 @@ export const approveAccessRequestFn = createServerFn({ method: "POST" })
       requestId: data.requestId,
       actorUserId: userId,
       workspaceName: data.workspaceName,
+      role: data.role,
+      grantPlatformAdmin: data.grantPlatformAdmin,
     });
   });
 
@@ -75,6 +79,7 @@ export const listOrganizationJoinRequests = createServerFn({ method: "POST" })
 const OrgApprove = z.object({
   organizationId: z.string().uuid(),
   requestId: z.string().uuid(),
+  role: z.enum(["admin", "reviewer", "viewer"]).optional(),
 });
 
 export const approveOrganizationJoinRequest = createServerFn({ method: "POST" })
@@ -86,6 +91,7 @@ export const approveOrganizationJoinRequest = createServerFn({ method: "POST" })
       requestId: data.requestId,
       actorUserId: userId,
       asOrganizationId: data.organizationId,
+      role: data.role,
     });
   });
 

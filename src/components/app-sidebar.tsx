@@ -58,7 +58,7 @@ export function AppSidebar() {
       return listPlatformWaiting();
     },
   });
-  const waitingCount = (waiting?.requests.length ?? 0) + (waiting?.pendingAccounts.length ?? 0);
+  const waitingCount = waiting?.requests.length ?? 0;
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   return (

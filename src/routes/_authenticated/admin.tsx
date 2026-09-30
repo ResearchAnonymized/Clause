@@ -12,14 +12,19 @@ import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, ChevronRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   listPlatformOrganizations,
   listPlatformUsers,
   listPlatformWaiting,
   provisionOrganization,
   reissueOwnerInviteLink,
+  issuePasswordResetLink,
+  signOutUserSessions,
   setPlatformMembershipRole,
   setPlatformRole,
+  setPendingInviteRole,
+  resendPendingAccountEmail,
   setUserDeactivated,
   type SaasOrgRole,
 } from "@/lib/platform-admin.functions";
@@ -62,6 +67,9 @@ function AdminPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [joinLinkFor, setJoinLinkFor] = useState<string | null>(null);
   const [joinLinkUrl, setJoinLinkUrl] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ userId: string; url: string } | null>(null);
+  const [approveRole, setApproveRole] = useState<Record<string, SaasOrgRole>>({});
+  const [approveAdmin, setApproveAdmin] = useState<Record<string, boolean>>({});
   const [openPerson, setOpenPerson] = useState<
     | { kind: "waiting"; id: string }
     | { kind: "request"; id: string }
@@ -149,16 +157,20 @@ function AdminPage() {
     }
   };
 
-  const approveRequest = async (requestId: string) => {
+  const approveRequest = async (requestId: string, existingOrganization: boolean) => {
     setBusy(true);
     try {
-      await approveAccessRequestFn({
+      const result = await approveAccessRequestFn({
         data: {
           requestId,
           workspaceName: requestWorkspace.trim() || undefined,
+          role: approveRole[requestId] ?? (existingOrganization ? "reviewer" : "owner"),
+          grantPlatformAdmin: Boolean(approveAdmin[requestId]),
         },
       });
-      toast.success(t("adminPage.requestApproved"));
+      toast.success(
+        result.emailed ? t("adminPage.requestApprovedEmailed") : t("adminPage.requestApproved"),
+      );
       setRejectingId(null);
       refreshDesk();
     } catch (e: any) {
@@ -185,6 +197,32 @@ function AdminPage() {
     }
   };
 
+  const updateWaitingRole = async (
+    inviteId: string,
+    role: SaasOrgRole,
+    grantPlatformAdmin: boolean,
+  ) => {
+    try {
+      await setPendingInviteRole({ data: { inviteId, role, grantPlatformAdmin } });
+      toast.success(t("adminPage.roleUpdated"));
+      refreshDesk();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not update role");
+    }
+  };
+
+  const emailWaiting = async (inviteId: string) => {
+    setBusy(true);
+    try {
+      const result = await resendPendingAccountEmail({ data: { inviteId } });
+      toast.success(result.emailed ? t("adminPage.waitingEmailed") : t("adminPage.waitingEmailLogged"));
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not email them");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const showJoinLink = async (organizationId: string) => {
     setBusy(true);
     try {
@@ -193,6 +231,53 @@ function AdminPage() {
       setJoinLinkUrl(result.acceptUrl);
     } catch (e: any) {
       toast.error(e.message ?? "Could not create join link");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createAccountUrl = () =>
+    typeof window === "undefined" ? "/auth?tab=signup" : `${window.location.origin}/auth?tab=signup`;
+
+  const tellThemMessage = (email: string) =>
+    t("adminPage.tellThemMessage", { email, url: createAccountUrl() });
+
+  const copyTellThem = async (email: string) => {
+    const text = tellThemMessage(email);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("adminPage.tellThemCopied"));
+    } catch {
+      toast.message(text);
+    }
+  };
+
+  const copyResetLink = async (userId: string) => {
+    setBusy(true);
+    try {
+      const result = await issuePasswordResetLink({ data: { userId } });
+      setResetLink({ userId, url: result.url });
+      try {
+        await navigator.clipboard.writeText(result.url);
+        toast.success(t("adminPage.resetLinkCopied"));
+      } catch {
+        toast.message(result.url);
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not create reset link");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOutEverywhere = async (userId: string) => {
+    setBusy(true);
+    try {
+      await signOutUserSessions({ data: { userId } });
+      toast.success(t("adminPage.signedOutEverywhere"));
+      refreshDesk();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not sign out sessions");
     } finally {
       setBusy(false);
     }
@@ -220,9 +305,6 @@ function AdminPage() {
         : r === "viewer"
           ? t("adminPage.roleViewer")
           : t("adminPage.roleReviewer");
-
-  const inviteRoleLabel = (r: string) =>
-    r === "owner" ? t("adminPage.owner") : r === "admin" ? t("peoplePage.admin") : t("peoplePage.member");
 
   const formatWhen = (value: Date | string | null | undefined) => {
     if (!value) return "—";
@@ -253,172 +335,236 @@ function AdminPage() {
         />
         <h1 className="text-2xl font-semibold tracking-tight">{t("adminPage.title")}</h1>
         <p className="text-muted-foreground mt-1">{t("adminPage.subtitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {waiting?.mailConfigured ? t("adminPage.mailOn") : t("adminPage.mailOff")}
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("adminPage.waitingTitle")}</CardTitle>
-          <p className="text-sm text-muted-foreground">{t("adminPage.waitingSubtitle")}</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {waitingEmpty ? (
-            <p className="text-sm text-muted-foreground">{t("adminPage.waitingEmpty")}</p>
-          ) : (
-            <>
-              {requests.length > 0 && (
-              <section className="space-y-3">
-                <h2 className="text-sm font-medium">{t("adminPage.waitingToApprove")}</h2>
-                    <div className="space-y-1 w-40">
-                      <Label>{t("adminPage.workspaceName")}</Label>
-                      <Input
-                        value={requestWorkspace}
-                        onChange={(e) => setRequestWorkspace(e.target.value)}
-                        placeholder={t("adminPage.workspaceNameDefault")}
-                      />
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t("adminPage.orgName")}</TableHead>
-                          <TableHead>{t("adminPage.requestContact")}</TableHead>
-                          <TableHead>{t("adminPage.requestNote")}</TableHead>
-                          <TableHead>{t("adminPage.requestRequested")}</TableHead>
-                          <TableHead />
-                        </TableRow>
-                      </TableHeader>
-                    <TableBody>
-                      {requests.map((r) => (
-                        <TableRow
-                          key={r.id}
-                          className="cursor-pointer"
-                          onClick={() => setOpenPerson({ kind: "request", id: r.id })}
-                        >
-                          <TableCell className="font-medium">
-                            <div>{r.organization_name}</div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {r.existingOrganization ? t("adminPage.requestJoinExisting") : t("adminPage.requestNewOrg")}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <button type="button" className="text-left hover:underline">
-                              <div>{r.contact_name}</div>
-                              <div className="text-xs text-muted-foreground">{r.contact_email}</div>
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate">
-                            {r.note || "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(r.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell
-                            className="space-x-2 whitespace-nowrap"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                              <Button size="sm" disabled={busy} onClick={() => void approveRequest(r.id)}>
-                                {t("adminPage.approve")}
-                              </Button>
-                              {rejectingId === r.id ? (
-                                <>
-                                  <Input
-                                    className="inline-flex h-8 w-44"
-                                    value={rejectReason}
-                                    onChange={(e) => setRejectReason(e.target.value)}
-                                    placeholder={t("adminPage.rejectReason")}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={busy}
-                                    onClick={() => void rejectRequest(r.id)}
-                                  >
-                                    {t("adminPage.reject")}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      setRejectingId(null);
-                                      setRejectReason("");
-                                    }}
-                                  >
-                                    {t("common.cancel")}
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={busy}
-                                  onClick={() => setRejectingId(r.id)}
-                                >
-                                  {t("adminPage.reject")}
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-              </section>
-              )}
+      {waitingEmpty ? (
+        <p className="text-sm text-muted-foreground">{t("adminPage.waitingEmpty")}</p>
+      ) : null}
 
-              <section className="space-y-3">
-                <div>
-                  <h2 className="text-sm font-medium">{t("adminPage.waitingToJoin")}</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("adminPage.waitingToJoinHint")}</p>
-                </div>
-                {pendingAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("adminPage.waitingToJoinEmpty")}</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("adminPage.user")}</TableHead>
-                        <TableHead>{t("adminPage.orgName")}</TableHead>
-                        <TableHead>{t("adminPage.inviteRole")}</TableHead>
-                        <TableHead />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingAccounts.map((p) => (
-                        <TableRow
-                          key={p.id}
-                          className="cursor-pointer"
-                          onClick={() => setOpenPerson({ kind: "waiting", id: p.id })}
+      {requests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("adminPage.waitingToApprove")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t("adminPage.waitingToApproveHint")}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1 w-40">
+              <Label>{t("adminPage.workspaceName")}</Label>
+              <Input
+                value={requestWorkspace}
+                onChange={(e) => setRequestWorkspace(e.target.value)}
+                placeholder={t("adminPage.workspaceNameDefault")}
+              />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("adminPage.orgName")}</TableHead>
+                  <TableHead>{t("adminPage.requestContact")}</TableHead>
+                  <TableHead>{t("adminPage.requestNote")}</TableHead>
+                  <TableHead>{t("adminPage.requestRequested")}</TableHead>
+                  <TableHead>{t("adminPage.orgRole")}</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {requests.map((r) => (
+                  <TableRow
+                    key={r.id}
+                    className="cursor-pointer"
+                    onClick={() => setOpenPerson({ kind: "request", id: r.id })}
+                  >
+                    <TableCell className="font-medium">
+                      <div>{r.organization_name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {r.existingOrganization ? t("adminPage.requestJoinExisting") : t("adminPage.requestNewOrg")}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <button type="button" className="text-left hover:underline">
+                        <div>{r.contact_name}</div>
+                        <div className="text-xs text-muted-foreground">{r.contact_email}</div>
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate">
+                      {r.note || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-2">
+                        <Select
+                          value={approveRole[r.id] ?? (r.existingOrganization ? "reviewer" : "owner")}
+                          onValueChange={(v) =>
+                            setApproveRole((prev) => ({ ...prev, [r.id]: v as SaasOrgRole }))
+                          }
                         >
-                          <TableCell>
-                            <button type="button" className="text-left hover:underline">
-                              <div className="text-sm font-medium">
-                                {p.contact_name || p.email}
-                              </div>
-                              {p.contact_name ? (
-                                <div className="text-xs text-muted-foreground">{p.email}</div>
-                              ) : null}
-                              <div className="text-[11px] text-muted-foreground">
-                                {t("adminPage.waitingToJoinStatus")}
-                              </div>
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-sm">{p.organization_name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {inviteRoleLabel(p.role)}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            <ChevronRight className="h-4 w-4 inline-block" />
-                            <span className="sr-only">{t("adminPage.openDetails")}</span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </section>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                          <SelectTrigger className="h-8 w-[190px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="owner">{t("adminPage.roleOwner")}</SelectItem>
+                            <SelectItem value="admin">{t("adminPage.roleOrgAdmin")}</SelectItem>
+                            <SelectItem value="reviewer">{t("adminPage.roleReviewer")}</SelectItem>
+                            <SelectItem value="viewer">{t("adminPage.roleViewer")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={Boolean(approveAdmin[r.id])}
+                            onCheckedChange={(checked) =>
+                              setApproveAdmin((prev) => ({ ...prev, [r.id]: checked === true }))
+                            }
+                          />
+                          {t("adminPage.alsoPlatformAdmin")}
+                        </label>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className="space-x-2 whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void approveRequest(r.id, r.existingOrganization)}
+                      >
+                        {t("adminPage.approve")}
+                      </Button>
+                      {rejectingId === r.id ? (
+                        <>
+                          <Input
+                            className="inline-flex h-8 w-44"
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder={t("adminPage.rejectReason")}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void rejectRequest(r.id)}
+                          >
+                            {t("adminPage.reject")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              setRejectingId(null);
+                              setRejectReason("");
+                            }}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => setRejectingId(r.id)}
+                        >
+                          {t("adminPage.reject")}
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {pendingAccounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("adminPage.waitingToJoin")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t("adminPage.waitingToJoinHint")}</p>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("peoplePage.email")}</TableHead>
+                  <TableHead>{t("adminPage.orgName")}</TableHead>
+                  <TableHead>{t("adminPage.inviteRole")}</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingAccounts.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => setOpenPerson({ kind: "waiting", id: p.id })}
+                  >
+                    <TableCell>
+                      <button type="button" className="text-left hover:underline">
+                        <div className="text-sm font-medium">{p.email}</div>
+                        {p.contact_name ? (
+                          <div className="text-xs text-muted-foreground">{p.contact_name}</div>
+                        ) : null}
+                        <div className="text-[11px] text-muted-foreground">
+                          {t("adminPage.waitingToJoinStatus")}
+                        </div>
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-sm">{p.organization_name}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-2">
+                        <Select
+                          value={p.saas_role}
+                          onValueChange={(v) =>
+                            void updateWaitingRole(p.id, v as SaasOrgRole, p.grant_platform_admin)
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-[190px]">
+                            <SelectValue>{saasRoleLabel(p.saas_role)}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="owner">{t("adminPage.roleOwner")}</SelectItem>
+                            <SelectItem value="admin">{t("adminPage.roleOrgAdmin")}</SelectItem>
+                            <SelectItem value="reviewer">{t("adminPage.roleReviewer")}</SelectItem>
+                            <SelectItem value="viewer">{t("adminPage.roleViewer")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={p.grant_platform_admin}
+                            onCheckedChange={(checked) =>
+                              void updateWaitingRole(p.id, p.saas_role, checked === true)
+                            }
+                          />
+                          {t("adminPage.alsoPlatformAdmin")}
+                        </label>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copyTellThem(p.email)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        {t("adminPage.tellThem")}
+                      </Button>
+                      <ChevronRight className="h-4 w-4 inline-block ml-2 text-muted-foreground" />
+                      <span className="sr-only">{t("adminPage.openDetails")}</span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -503,9 +649,21 @@ function AdminPage() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     {r.id !== user?.id && (
-                      <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id, !r.deactivated)}>
-                        {r.deactivated ? t("adminPage.reactivate") : t("adminPage.deactivate")}
-                      </Button>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {!r.deactivated && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void copyResetLink(r.id)}
+                          >
+                            {t("adminPage.resetPassword")}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id, !r.deactivated)}>
+                          {r.deactivated ? t("adminPage.reactivate") : t("adminPage.deactivate")}
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -584,13 +742,18 @@ function AdminPage() {
           {waitingPerson && (
             <>
               <SheetHeader className="text-left pr-6">
-                <SheetTitle>{waitingPerson.contact_name || waitingPerson.email}</SheetTitle>
+                <SheetTitle>{waitingPerson.email}</SheetTitle>
                 <SheetDescription>{t("adminPage.waitingDetailsLead")}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-4 text-sm">
-                <DetailField label={t("peoplePage.email")} value={waitingPerson.email} />
+                {waitingPerson.contact_name ? (
+                  <DetailField label={t("adminPage.user")} value={waitingPerson.contact_name} />
+                ) : null}
                 <DetailField label={t("adminPage.orgName")} value={waitingPerson.organization_name} />
-                <DetailField label={t("adminPage.inviteRole")} value={inviteRoleLabel(waitingPerson.role)} />
+                <DetailField label={t("adminPage.inviteRole")} value={saasRoleLabel(waitingPerson.saas_role)} />
+                {waitingPerson.grant_platform_admin ? (
+                  <DetailField label={t("adminPage.platformRole")} value={t("adminPage.admin")} />
+                ) : null}
                 <DetailField label={t("adminPage.status")} value={t("adminPage.waitingToJoinStatus")} />
                 <DetailField label={t("adminPage.requestRequested")} value={formatWhen(waitingPerson.requested_at)} />
                 <DetailField label={t("adminPage.approvedAt")} value={formatWhen(waitingPerson.approved_at)} />
@@ -603,6 +766,24 @@ function AdminPage() {
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                   <div className="font-medium">{t("adminPage.howToJoin")}</div>
                   <p className="text-xs text-muted-foreground">{t("adminPage.howToJoinBody")}</p>
+                  <p className="text-xs rounded-md border bg-background p-2 select-all leading-relaxed">
+                    {tellThemMessage(waitingPerson.email)}
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => void copyTellThem(waitingPerson.email)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {t("adminPage.tellThem")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void emailWaiting(waitingPerson.id)}
+                  >
+                    {t("adminPage.emailThem")}
+                  </Button>
                   {waitingPerson.role === "owner" && (
                     joinLinkFor === waitingPerson.organization_id && joinLinkUrl ? (
                       <div className="flex gap-2">
@@ -686,6 +867,57 @@ function AdminPage() {
                     <p className="mt-1 text-muted-foreground">—</p>
                   )}
                 </div>
+                {inPerson.id !== user?.id && (
+                  <div className="flex flex-col gap-2 pt-2">
+                    {!inPerson.deactivated && (
+                      <>
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void copyResetLink(inPerson.id)}
+                        >
+                          {t("adminPage.copyResetLink")}
+                        </Button>
+                        {resetLink?.userId === inPerson.id && (
+                          <div className="flex gap-2">
+                            <Input readOnly value={resetLink.url} className="font-mono text-xs" />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(resetLink.url);
+                                  toast.success(t("adminPage.resetLinkCopied"));
+                                } catch {
+                                  toast.message(resetLink.url);
+                                }
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void signOutEverywhere(inPerson.id)}
+                    >
+                      {t("adminPage.signOutEverywhere")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => toggleActive(inPerson.id, !inPerson.deactivated)}
+                    >
+                      {inPerson.deactivated ? t("adminPage.reactivate") : t("adminPage.deactivate")}
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -37,6 +37,7 @@ function OrganizationSettingsPage() {
   const [newWsName, setNewWsName] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [joinRole, setJoinRole] = useState<Record<string, "admin" | "reviewer" | "viewer">>({});
 
   const { data: members = [] } = useQuery({
     queryKey: ["org-members", organizationId],
@@ -154,7 +155,9 @@ function OrganizationSettingsPage() {
     setBusy(true);
     try {
       const { approveOrganizationJoinRequest } = await import("@/lib/access-requests.functions");
-      await approveOrganizationJoinRequest({ data: { organizationId, requestId } });
+      await approveOrganizationJoinRequest({
+        data: { organizationId, requestId, role: joinRole[requestId] ?? "reviewer" },
+      });
       toast.success(t("peoplePage.joinApproved"));
       qc.invalidateQueries({ queryKey: ["org-join-requests", organizationId] });
       qc.invalidateQueries({ queryKey: ["org-invites", organizationId] });
@@ -311,7 +314,22 @@ function OrganizationSettingsPage() {
                   <p className="text-xs text-muted-foreground">{r.contact_email}</p>
                   {r.note ? <p className="text-xs text-muted-foreground mt-1">{r.note}</p> : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={joinRole[r.id] ?? "reviewer"}
+                    onValueChange={(v) =>
+                      setJoinRole((prev) => ({ ...prev, [r.id]: v as "admin" | "reviewer" | "viewer" }))
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[170px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reviewer">{t("peoplePage.roleReviewer")}</SelectItem>
+                      <SelectItem value="viewer">{t("peoplePage.roleViewer")}</SelectItem>
+                      <SelectItem value="admin">{t("peoplePage.roleAdmin")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button size="sm" disabled={busy} onClick={() => void approveJoin(r.id)}>
                     {t("adminPage.approve")}
                   </Button>

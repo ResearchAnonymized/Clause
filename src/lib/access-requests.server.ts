@@ -1,7 +1,9 @@
 import { getSql } from "@/db/pool";
 import { normalizeOrgName } from "@/lib/access-requests";
-import { inviteAcceptUrl } from "@/lib/mailer.server";
+import { accessApprovedMail, inviteAcceptUrl, sendMail } from "@/lib/mailer.server";
 import { recordAuthEvent } from "@/lib/auth/events";
+import { rolesFromSaas, saasRoleLabelEn, type SaasOrgRole } from "@/lib/saas-roles";
+import { PRODUCT_NAME } from "@/config/instance";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -22,6 +24,8 @@ async function inviteContactIntoOrganization(opts: {
   email: string;
   invitedBy: string;
   skipMembershipCheck?: boolean;
+  role?: SaasOrgRole;
+  grantPlatformAdmin?: boolean;
 }): Promise<{ token: string; acceptUrl: string }> {
   const sql = getSql();
   const { createOrganizationInvite } = await import("@/lib/organizations.server");
@@ -30,14 +34,18 @@ async function inviteContactIntoOrganization(opts: {
     WHERE organization_id = ${opts.organizationId}
     ORDER BY created_at ASC
   `;
+  const saas = opts.role ?? "reviewer";
+  const { orgRole, workspaceRole } = rolesFromSaas(saas);
   const invite = await createOrganizationInvite({
     organizationId: opts.organizationId,
     email: opts.email,
-    role: "member",
+    role: orgRole,
     invitedBy: opts.invitedBy,
-    workspaceIds: workspaces.map((w: { id: string }) => w.id),
-    workspaceRole: "reviewer",
+    workspaceIds: workspaces.map((w: any) => w.id as string),
+    workspaceRole,
     skipMembershipCheck: opts.skipMembershipCheck,
+    allowOwnerInvite: orgRole === "owner",
+    grantPlatformAdmin: opts.grantPlatformAdmin,
   });
   return { token: invite.token, acceptUrl: inviteAcceptUrl(invite.token) };
 }
@@ -91,6 +99,14 @@ export async function submitAccessRequest(opts: {
     ip: opts.ip ?? null,
     meta: { organizationName },
   });
+  const { notifyPlatformAdmins, joinRequestNotice } = await import("@/lib/platform-notifications.server");
+  await notifyPlatformAdmins(
+    joinRequestNotice({
+      name: contactName,
+      email: contactEmail,
+      orgName: organizationName,
+    }),
+  );
   return { ok: true };
 }
 
@@ -152,7 +168,9 @@ export async function approveAccessRequest(opts: {
   actorUserId: string;
   workspaceName?: string;
   asOrganizationId?: string;
-}): Promise<{ acceptUrl: string; organizationId: string; kind: "join" | "new_org" }> {
+  role?: SaasOrgRole;
+  grantPlatformAdmin?: boolean;
+}): Promise<{ acceptUrl: string; organizationId: string; kind: "join" | "new_org"; emailed: boolean }> {
   const sql = getSql();
   const { recordOrgAudit } = await import("@/lib/organizations.server");
   const rows = await sql`
@@ -182,6 +200,11 @@ export async function approveAccessRequest(opts: {
   let organizationId: string;
   let acceptUrl: string;
   let kind: "join" | "new_org";
+  const fromOrgDesk = Boolean(opts.asOrganizationId);
+  const grantPlatformAdmin = fromOrgDesk ? false : Boolean(opts.grantPlatformAdmin);
+  const requestedRole: SaasOrgRole = fromOrgDesk
+    ? (opts.role && opts.role !== "owner" ? opts.role : "reviewer")
+    : (opts.role ?? (matched ? "reviewer" : "owner"));
 
   if (matched) {
     const invited = await inviteContactIntoOrganization({
@@ -189,6 +212,8 @@ export async function approveAccessRequest(opts: {
       email: contactEmail,
       invitedBy: opts.actorUserId,
       skipMembershipCheck: !opts.asOrganizationId,
+      role: requestedRole,
+      grantPlatformAdmin,
     });
     organizationId = matched.id;
     acceptUrl = invited.acceptUrl;
@@ -207,6 +232,21 @@ export async function approveAccessRequest(opts: {
     organizationId = provisioned.organizationId;
     acceptUrl = inviteAcceptUrl(provisioned.token);
     kind = "new_org";
+    if (requestedRole !== "owner" || grantPlatformAdmin) {
+      const { orgRole, workspaceRole } = rolesFromSaas(requestedRole === "owner" ? "owner" : requestedRole);
+      await sql`
+        UPDATE organization_invites
+        SET role = ${orgRole}::organization_role,
+            workspace_role = ${workspaceRole}::workspace_role,
+            grant_platform_admin = ${grantPlatformAdmin}
+        WHERE id = ${provisioned.inviteId}
+      `;
+      await sql`
+        UPDATE organization_invite_workspaces
+        SET workspace_role = ${workspaceRole}::workspace_role
+        WHERE invite_id = ${provisioned.inviteId}
+      `;
+    }
   }
 
   await sql`
@@ -228,9 +268,21 @@ export async function approveAccessRequest(opts: {
     actorUserId: opts.actorUserId,
     event: "access_approved",
     targetEmail: contactEmail,
-    meta: { requestId: opts.requestId, kind },
+    meta: { requestId: opts.requestId, kind, role: requestedRole, grantPlatformAdmin },
   });
-  return { acceptUrl, organizationId, kind };
+  const mail = accessApprovedMail({
+    product: PRODUCT_NAME,
+    orgName,
+    email: contactEmail,
+    roleLabel: saasRoleLabelEn(requestedRole),
+    acceptUrl,
+  });
+  const sent = await sendMail({
+    to: contactEmail,
+    subject: mail.subject,
+    text: mail.text,
+  });
+  return { acceptUrl, organizationId, kind, emailed: sent.delivered };
 }
 
 export async function rejectAccessRequest(opts: {

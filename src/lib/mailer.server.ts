@@ -12,9 +12,45 @@ export function mailConfigured(): boolean {
   return Boolean(process.env.SMTP_HOST?.trim());
 }
 
+function appOrigin(): string {
+  return (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+}
+
+export function createAccountUrl(): string {
+  return `${appOrigin()}/auth?tab=signup`;
+}
+
 export function inviteAcceptUrl(token: string): string {
-  const origin = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-  return `${origin}/invite/accept?token=${token}`;
+  return `${appOrigin()}/invite/accept?token=${token}`;
+}
+
+export function passwordResetUrl(token: string): string {
+  return `${appOrigin()}/reset?token=${token}`;
+}
+
+export function accessApprovedMail(opts: {
+  product: string;
+  orgName: string;
+  email: string;
+  roleLabel: string;
+  acceptUrl: string;
+}) {
+  const signup = createAccountUrl();
+  return {
+    subject: `You can join ${opts.orgName} on ${opts.product}`,
+    text: [
+      `You have been approved for ${opts.orgName} on ${opts.product} as ${opts.roleLabel}.`,
+      ``,
+      `Create an account at:`,
+      signup,
+      ``,
+      `Use this work email: ${opts.email}`,
+      `You do not need to paste a join link.`,
+      ``,
+      `Optional join link (14 days):`,
+      opts.acceptUrl,
+    ].join("\n"),
+  };
 }
 
 /** Owner named by GPT-Lab: same join path as any other invite. */
@@ -24,17 +60,10 @@ export function ownerInviteMail(opts: {
   email: string;
   acceptUrl: string;
 }) {
-  return {
-    subject: `Join ${opts.orgName} on ${opts.product}`,
-    text: [
-        `You have been named the responsible person for ${opts.orgName} on ${opts.product}.`,
-      ``,
-      `Create an account or sign in with ${opts.email} — that same work email is enough to join. You do not need to paste a link.`,
-      ``,
-      `Optional join link (expires in 14 days):`,
-      opts.acceptUrl,
-    ].join("\n"),
-  };
+  return accessApprovedMail({
+    ...opts,
+    roleLabel: "Owner",
+  });
 }
 
 export function colleagueInviteMail(opts: {
@@ -43,15 +72,20 @@ export function colleagueInviteMail(opts: {
   email: string;
   acceptUrl: string;
 }) {
+  const signup = createAccountUrl();
   const where = opts.orgName ? ` ${opts.orgName} on` : "";
   return {
     subject: `Join${opts.orgName ? ` ${opts.orgName}` : ""} on ${opts.product}`,
     text: [
       `You have been invited to${where} ${opts.product}.`,
       ``,
-      `Create an account or sign in with ${opts.email} — that same work email is enough to join. You do not need to paste a link.`,
+      `Create an account at:`,
+      signup,
       ``,
-      `Optional join link (expires in 14 days):`,
+      `Use this work email: ${opts.email}`,
+      `You do not need to paste a join link.`,
+      ``,
+      `Optional join link (14 days):`,
       opts.acceptUrl,
     ].join("\n"),
   };

@@ -184,9 +184,11 @@ describe("access requests without email", () => {
     const approved = await approveAccessRequest({
       requestId: rows[0].id as string,
       actorUserId: actorId,
+      role: "admin",
     });
     expect(approved.kind).toBe("join");
     expect(approved.organizationId).toBe(orgIds[0]);
+    expect(approved.emailed).toBe(false);
     const token = new URL(approved.acceptUrl).searchParams.get("token");
     const joined = await acceptOrganizationInvite({
       token: token!,
@@ -194,5 +196,11 @@ describe("access requests without email", () => {
       userEmail: otherEmail,
     });
     expect(joined.organizationId).toBe(orgIds[0]);
+    const mem = await sql`
+      SELECT role FROM organization_members
+      WHERE user_id = ${otherId} AND organization_id = ${orgIds[0]}
+      LIMIT 1
+    `;
+    expect(mem[0]?.role).toBe("admin");
   });
 });

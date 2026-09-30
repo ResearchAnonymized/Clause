@@ -16,7 +16,7 @@ import {
 import { signupMode } from "@/config/instance";
 import { clientKey, rateLimit } from "@/lib/auth/rate-limit";
 import { recordAuthEvent } from "@/lib/auth/events";
-import { mailConfigured, sendMail } from "@/lib/mailer.server";
+import { mailConfigured, passwordResetUrl, sendMail } from "@/lib/mailer.server";
 import { PRODUCT_NAME } from "@/config/instance";
 import { getSql } from "@/db/pool";
 import { findPendingInviteByEmail, hashInviteToken } from "@/lib/organizations.server";
@@ -92,8 +92,7 @@ export const Route = createFileRoute("/api/auth")({
           const canMail = mailConfigured();
           if (rows[0]) {
             const token = await issueAuthToken({ purpose: "reset", userId: rows[0].id, email, hours: 2 });
-            const origin = process.env.APP_URL || "http://localhost:3000";
-            const url = `${origin}/reset?token=${token}`;
+            const url = passwordResetUrl(token);
             await sendMail({
               to: email,
               subject: `Reset your ${PRODUCT_NAME} password`,

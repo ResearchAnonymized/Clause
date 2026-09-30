@@ -46,7 +46,7 @@ function DashboardPage() {
       return listPlatformWaiting();
     },
   });
-  const waitingCount = (waiting?.requests.length ?? 0) + (waiting?.pendingAccounts.length ?? 0);
+  const waitingCount = waiting?.requests.length ?? 0;
 
   const failedCutoffMs = Date.now() - 24 * 60 * 60 * 1000;
 

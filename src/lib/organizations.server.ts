@@ -162,6 +162,7 @@ export async function createOrganizationInvite(opts: {
   workspaceRole?: WorkspaceRole;
   allowOwnerInvite?: boolean;
   skipMembershipCheck?: boolean;
+  grantPlatformAdmin?: boolean;
 }): Promise<{ token: string; inviteId: string; expiresAt: Date }> {
   if (opts.role === "owner" && !opts.allowOwnerInvite) {
     throw new Error("Cannot invite as owner — transfer ownership instead");
@@ -200,7 +201,7 @@ export async function createOrganizationInvite(opts: {
 
   const rows = await sql`
     INSERT INTO organization_invites (
-      organization_id, email, role, workspace_role, token_hash, invited_by, expires_at
+      organization_id, email, role, workspace_role, token_hash, invited_by, expires_at, grant_platform_admin
     )
     VALUES (
       ${opts.organizationId},
@@ -209,7 +210,8 @@ export async function createOrganizationInvite(opts: {
       ${workspaceRole}::workspace_role,
       ${hashInviteToken(token)},
       ${opts.invitedBy},
-      ${expiresAt}
+      ${expiresAt},
+      ${Boolean(opts.grantPlatformAdmin)}
     )
     RETURNING id
   `;
@@ -340,6 +342,7 @@ type InviteRecord = {
   expires_at: Date | string;
   accepted_at: Date | string | null;
   revoked_at: Date | string | null;
+  grant_platform_admin?: boolean;
 };
 
 function assertInviteOpen(invite: InviteRecord | undefined): asserts invite is InviteRecord {
@@ -354,7 +357,7 @@ export async function findPendingInviteByEmail(email: string): Promise<InviteRec
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
   const rows = await sql`
-    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at
+    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at, grant_platform_admin
     FROM organization_invites
     WHERE lower(email) = ${normalized}
       AND accepted_at IS NULL
@@ -460,6 +463,25 @@ async function applyOrganizationInvite(opts: {
     meta: { role, workspaceIds: targets.map((t) => t.workspace_id) },
   });
 
+  if (invite.grant_platform_admin) {
+    await sql`DELETE FROM user_roles WHERE user_id = ${opts.userId}`;
+    await sql`
+      INSERT INTO user_roles (user_id, role)
+      VALUES (${opts.userId}, 'admin'::app_role)
+    `;
+  }
+
+  const orgNameRow = await sql`SELECT name FROM organizations WHERE id = ${organizationId} LIMIT 1`;
+  const { notifyPlatformAdmins, someoneJoinedNotice } = await import("@/lib/platform-notifications.server");
+  const { saasRoleFromMembership, saasRoleLabelEn } = await import("@/lib/saas-roles");
+  const saas = saasRoleFromMembership(role, invite.workspace_role ?? fallbackRole);
+  const notice = someoneJoinedNotice({
+    email: userEmail,
+    orgName: String(orgNameRow[0]?.name ?? "an organization"),
+    roleLabel: saasRoleLabelEn(saas),
+  });
+  await notifyPlatformAdmins({ ...notice, exceptUserId: opts.userId });
+
   return { organizationId, workspaceId };
 }
 
@@ -471,7 +493,7 @@ export async function acceptOrganizationInvite(opts: {
   const sql = getSql();
   const tokenHash = hashInviteToken(parseInviteInput(opts.token));
   const invites = await sql`
-    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at
+    SELECT id, organization_id, email, role, workspace_role, expires_at, accepted_at, revoked_at, grant_platform_admin
     FROM organization_invites
     WHERE token_hash = ${tokenHash}
     LIMIT 1
