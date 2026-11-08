@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
@@ -88,6 +89,7 @@ function kindAccent(kind?: string | null) {
 }
 
 export function PackBrowser({ docs, selectedId, onSelect, title, tone = "tender", className }: Props) {
+  const { t } = useTranslation();
   const sorted = useMemo(
     () =>
       [...docs].sort(
@@ -122,10 +124,10 @@ export function PackBrowser({ docs, selectedId, onSelect, title, tone = "tender"
                 tone === "bidder" ? "text-amber-700/80 dark:text-amber-300/80" : "text-sky-700/80 dark:text-sky-300/80",
               )}
             >
-              {title ?? (tone === "bidder" ? "Bidder pack" : "Tender pack")}
+              {title ?? t(tone === "bidder" ? "review.packSupplier" : "review.packCustomer")}
             </div>
             <div className="text-sm font-semibold truncate mt-0.5 tracking-tight">
-              {packLabel && packLabel !== "direct" ? packLabel : `${sorted.length} file(s)`}
+              {packLabel && packLabel !== "direct" ? packLabel : t("review.packFileCount", { count: sorted.length })}
             </div>
           </div>
           <div

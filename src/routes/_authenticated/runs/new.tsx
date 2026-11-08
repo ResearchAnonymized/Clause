@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Upload, Play, FileText, X, Layers, Package } from "lucide-react";
+import { Upload, Play, FileText, X, Layers, Package, FlaskConical } from "lucide-react";
+import { loadSamplePacks } from "@/lib/sample-packs";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
@@ -58,6 +59,23 @@ function NewRunPage() {
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [criteriaSetId, setCriteriaSetId] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [loadingSamples, setLoadingSamples] = useState(false);
+
+  const applySamples = async () => {
+    setLoadingSamples(true);
+    try {
+      const packs = await loadSamplePacks();
+      setMode("tender");
+      setTenderFiles(packs.tender);
+      setBidderFiles(packs.bidder);
+      if (!title) setTitle(t("newRun.sampleTitle"));
+      toast.success(t("onboarding.samplesLoaded"));
+    } catch (err: any) {
+      toast.error(String(err?.message ?? err));
+    } finally {
+      setLoadingSamples(false);
+    }
+  };
 
   const coachPhase: NewRunCoachPhase = !showCoach
     ? null
@@ -284,6 +302,19 @@ function NewRunPage() {
         <PageBreadcrumbs items={[{ label: t("runs.title"), to: "/runs" }, { label: t("newRun.title") }]} />
         <h1 className="text-2xl font-semibold tracking-tight">{t("newRun.title")}</h1>
         <p className="text-muted-foreground mt-1">{t("newRun.subtitle")}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+          <p className="text-sm text-muted-foreground max-w-xl">{t("newRun.samplesAlways")}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void applySamples()}
+            disabled={loadingSamples || busy}
+          >
+            <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
+            {loadingSamples ? t("onboarding.loadingSamples") : t("onboarding.loadSamples")}
+          </Button>
+        </div>
       </div>
 
       <NewRunCoach

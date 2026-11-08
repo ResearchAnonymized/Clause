@@ -65,6 +65,7 @@ export function RunWorkspaceLayout({
               active={page === item.id}
               icon={item.icon}
               label={t(`review.${item.labelKey}`)}
+              hint={item.id === "analysis" ? t("review.navStartHere") : undefined}
             />
           ))}
         </div>
@@ -123,6 +124,7 @@ function RunNavLink({
   active,
   icon: Icon,
   label,
+  hint,
   compact = false,
 }: {
   runId: string;
@@ -130,6 +132,7 @@ function RunNavLink({
   active: boolean;
   icon: LucideIcon;
   label: string;
+  hint?: string;
   compact?: boolean;
 }) {
   const className = cn(
@@ -137,6 +140,7 @@ function RunNavLink({
     compact
       ? "gap-1.5 rounded-md px-2.5 py-1.5 text-xs"
       : "w-full gap-2.5 rounded-md px-2.5 py-2 text-sm",
+    page === "analysis" && !active ? "text-foreground/80" : null,
     active
       ? "bg-background text-foreground shadow-sm font-medium"
       : "text-muted-foreground hover:text-foreground hover:bg-background/70",
@@ -145,7 +149,12 @@ function RunNavLink({
   const inner = (
     <>
       <Icon className={cn("shrink-0", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-      <span>{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
+      {hint && !compact ? (
+        <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-brand shrink-0">
+          {hint}
+        </span>
+      ) : null}
     </>
   );
 

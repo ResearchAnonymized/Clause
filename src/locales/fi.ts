@@ -414,11 +414,11 @@ const fi: DeepPartial<Translation> = {
       },
       newAnalysis: {
         title: "Uusi analyysi",
-        body: "Lataa tarjouspyyntö vasemmalle ja tarjoajan aineisto oikealle. ZIP-tiedostot avautuvat automaattisesti. Harjoitteluun on esimerkkiaineistoja.",
+        body: "Asiakasaineisto vasemmalle, toimittaja-aineisto oikealle. ZIP purkautuu automaattisesti. Lataa esimerkkiaineistot, jos et voi käyttää oikeita sopimuksia.",
       },
       analyses: {
         title: "Analyysit",
-        body: "Jokainen tarkastus on ajo. Avaa se seurataksesi agentteja, sitten kartoitus ja raportti.",
+        body: "Avaa tarkastus. Analyysi on koti: värit, sitten napsauta havaintoa. Kartoitus ja raportti ovat lisäosia.",
       },
       criteria: {
         title: "Kriteerikirjasto",
@@ -434,7 +434,7 @@ const fi: DeepPartial<Translation> = {
       },
       help: {
         title: "Ohje",
-        body: "Kirjallinen opas. Käynnistä tämä kierros tai käytön aloitus -lista täältä milloin tahansa.",
+        body: "Neljä vaihetta palvelupäällikölle: lataa, odota, lue värit, napsauta aihetta. Käynnistä kierros täältä.",
       },
     },
   },
@@ -935,14 +935,15 @@ const fi: DeepPartial<Translation> = {
   },
   runs: {
     title: "Analyysit",
-    subtitle: "Kaikki tämän työtilan sopimusanalyysit.",
+    subtitle: "Avaa analyysi uudelleen — asiakas- ja toimittaja-aineistot säilyvät.",
     exportCsv: "Vie CSV",
     compare: "Vertaile",
+    multiBidder: "Useita tarjoajia",
     newAnalysis: "Uusi analyysi",
     emptyTitle: "Ei vielä analyysejä",
     emptyCopy: "Lataa asiakasmalli ja toimittajan tarjous suorittaaksesi ensimmäisen sopimusanalyysin.",
     startFirst: "Aloita ensimmäinen analyysi",
-    searchPlaceholder: "Hae otsikolla…",
+    searchPlaceholder: "Hae otsikolla tai aineiston nimellä…",
     allStatuses: "Kaikki tilat",
     anySeverity: "Mikä tahansa vakavuus",
     hasCritical: "Sisältää kriittisiä",
@@ -1015,6 +1016,7 @@ const fi: DeepPartial<Translation> = {
     startedN: "Käynnistetty {{done}} / {{total}} analyysia",
     failed: "Analyysin käynnistys epäonnistui",
     sampleTitle: "Esimerkki · julkisen hankinnan harjoituspaketti",
+    samplesAlways: "Ei oikeita sopimuksia anonymisoitavaksi? Lataa esimerkkiaineistot ja harjoittele pienellä setillä.",
   },
 
   runDetail: {
@@ -1177,6 +1179,13 @@ const fi: DeepPartial<Translation> = {
     categoryShortLegal: "Ehdot",
     categoryShortScope: "Sisältö",
     categoryShortOther: "Muu",
+    findFinding: "Etsi havaintoa (esim. irtisanominen)",
+    findEmpty: "Mikään havainto ei vastaa hakua.",
+    startHereFindings: "Aloita näistä — kriittiset",
+    navStartHere: "Aloita tästä",
+    packCustomer: "Asiakasaineisto",
+    packSupplier: "Toimittaja-aineisto",
+    packFileCount: "{{count}} tiedostoa",
   },
 
   helpPage: {

@@ -22,6 +22,13 @@
 - Switch language to Suomi: New analysis and Help and colour legend in Finnish; start still works.
 - `pnpm test` (unit). Do not run a live analysis unless you mean to.
 
+## Follow-up in the same path (still no engine change)
+
+5. Sample packs stay on New analysis even after the first-run coach is dismissed (workaround for anonymising real contracts).
+6. Analysis list: search a finding (e.g. termination), and **Start here** chips for critical items.
+7. Analysis nav marks **Start here**; Documents uses Customer / Supplier pack labels and a file count.
+8. Analyses list leftover English (Tender/Bidder, search, subtitle) is translated.
+
 ## Out of this change
 
-Anonymiser, large-pack performance, measuring hours saved, extra AI assistant, 2M-IT’s own cluster.
+Anonymiser, large-pack performance, measuring hours saved, extra AI assistant, 2M-IT’s own cluster. Those were not product requests we can ship in this repo without new ops credentials or a research protocol.

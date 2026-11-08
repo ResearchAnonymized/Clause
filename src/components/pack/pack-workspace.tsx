@@ -222,7 +222,7 @@ export function PackWorkspace({
             )}
             onClick={() => setSide("customer")}
           >
-            Tender ({tender.length})
+            {t("review.packCustomer")} ({tender.length})
           </button>
           <button
             type="button"
@@ -232,7 +232,7 @@ export function PackWorkspace({
             )}
             onClick={() => setSide("supplier")}
           >
-            Bidder ({bidder.length})
+            {t("review.packSupplier")} ({bidder.length})
           </button>
         </div>
         <div className="flex-1" />
@@ -247,7 +247,7 @@ export function PackWorkspace({
           docs={activeList}
           selectedId={activeDoc?.id ?? null}
           onSelect={setActiveId}
-          title={side === "customer" ? "Tender register" : "Bidder register"}
+          title={side === "customer" ? t("review.packCustomer") : t("review.packSupplier")}
           tone={side === "customer" ? "tender" : "bidder"}
         />
         <div className="flex flex-col min-h-0 min-w-0 bg-muted/10">

@@ -116,9 +116,7 @@ function RunsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap" data-tour-stage="analyses">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("runs.title")}</h1>
-          <p className="text-muted-foreground mt-1">
-            Stored case history — reopen any analysis with its tender and bidder packs intact.
-          </p>
+          <p className="text-muted-foreground mt-1">{t("runs.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={exportCsv} disabled={!filtered.length}>
@@ -131,7 +129,7 @@ function RunsPage() {
           </Button>
           <Button variant="outline" asChild>
             <Link to="/runs/bidders">
-              <Table2 className="w-4 h-4 mr-1" /> Multi-bidder
+              <Table2 className="w-4 h-4 mr-1" /> {t("runs.multiBidder")}
             </Link>
           </Button>
           <Button asChild>
@@ -167,7 +165,7 @@ function RunsPage() {
                   <Input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search title or pack name…"
+                    placeholder={t("runs.searchPlaceholder")}
                     className="pl-9"
                   />
                 </div>
@@ -220,8 +218,8 @@ function RunsPage() {
                       : r.status === "failed"
                         ? t("runs.failed")
                         : r.status;
-              const tenderLabel = r.customer_pack_label || "Tender pack";
-              const bidderLabel = r.supplier_pack_label || "Bidder pack";
+              const tenderLabel = r.customer_pack_label || t("review.packCustomer");
+              const bidderLabel = r.supplier_pack_label || t("review.packSupplier");
               const tenderN = r.customer_doc_count ?? 0;
               const bidderN = r.supplier_doc_count ?? 0;
 
@@ -245,7 +243,7 @@ function RunsPage() {
                           <div className="font-semibold tracking-tight truncate">{r.title}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">
                             {formatDistanceToNow(new Date(r.created_at), { addSuffix: true, locale: loc })}
-                            {r.review_status === "signed" ? " · Review signed" : ""}
+                            {r.review_status === "signed" ? ` · ${t("runDetail.reviewSigned")}` : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -263,28 +261,34 @@ function RunsPage() {
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="rounded-lg border border-sky-500/20 bg-sky-500/[0.05] px-3 py-2">
                           <div className="text-[10px] uppercase tracking-wider text-sky-700/80 dark:text-sky-300/80 font-semibold flex items-center gap-1">
-                            <Package className="w-3 h-3" /> Tender
+                            <Package className="w-3 h-3" /> {t("review.packCustomer")}
                           </div>
                           <div className="text-sm font-medium truncate mt-0.5">{tenderLabel}</div>
                           <div className="text-[11px] text-muted-foreground mt-0.5">
-                            {tenderN} document{tenderN === 1 ? "" : "s"} stored
+                            {t("review.packFileCount", { count: tenderN })}
                           </div>
                         </div>
                         <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2">
                           <div className="text-[10px] uppercase tracking-wider text-amber-700/80 dark:text-amber-300/80 font-semibold flex items-center gap-1">
-                            <Package className="w-3 h-3" /> Bidder
+                            <Package className="w-3 h-3" /> {t("review.packSupplier")}
                           </div>
                           <div className="text-sm font-medium truncate mt-0.5">{bidderLabel}</div>
                           <div className="text-[11px] text-muted-foreground mt-0.5">
-                            {bidderN} document{bidderN === 1 ? "" : "s"} stored
+                            {t("review.packFileCount", { count: bidderN })}
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 text-xs flex-wrap">
-                        <span className="text-critical font-medium">{r.critical_count ?? 0} critical</span>
-                        <span className="text-warning font-medium">{r.warning_count ?? 0} warning</span>
-                        <span className="text-ok font-medium">{r.ok_count ?? 0} meets</span>
+                        <span className="text-critical font-medium">
+                          {r.critical_count ?? 0} {t("dashboard.criticalShort")}
+                        </span>
+                        <span className="text-warning font-medium">
+                          {r.warning_count ?? 0} {t("dashboard.warningShort")}
+                        </span>
+                        <span className="text-ok font-medium">
+                          {r.ok_count ?? 0} {t("dashboard.meets")}
+                        </span>
                         {r.summary && (
                           <span className="text-muted-foreground truncate max-w-md">· {formatRunSummary(r.summary)}</span>
                         )}

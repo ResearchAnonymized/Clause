@@ -5,11 +5,12 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { toVerdict, verdictTone, type Verdict } from "@/lib/verdict";
-import { ChevronLeft, ChevronRight, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, FileStack, LocateFixed } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, Loader2, CheckCircle2, XCircle, AlertTriangle, MinusCircle, PenLine, RefreshCw, Clock, Lock, FileStack, LocateFixed, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
   ANALYZER_VERSION,
@@ -214,6 +215,7 @@ function ReviewRoomPage() {
 
   const [activeCat, setActiveCat] = useState<string>("__all__");
   const [activeFindingId, setActiveFindingId] = useState<string | null>(null);
+  const [findingQuery, setFindingQuery] = useState("");
 
   // Agent tabs — group by category, with counts, sorted by risk (gaps first)
   const groups = useMemo(() => {
@@ -261,6 +263,34 @@ function ReviewRoomPage() {
       return risk(b.items) - risk(a.items);
     });
   }, [visibleRows, t]);
+
+  const criticalRows = useMemo(
+    () => rows.filter((r) => r.finding && toVerdict(r.finding.severity) === "gap").slice(0, 4),
+    [rows],
+  );
+
+  const filteredStreamGroups = useMemo(() => {
+    const q = findingQuery.trim().toLowerCase();
+    if (!q) return streamGroups;
+    return streamGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((r) => {
+          const hay = [
+            r.criterion.name,
+            r.criterion.category,
+            r.finding?.justification,
+            r.finding?.criterion_name,
+            topicLabel(t, r.criterion.category),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return hay.includes(q);
+        }),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [streamGroups, findingQuery, t]);
 
   const supplierDocs = (docs ?? []).filter((d) => d.role === "supplier");
   const customerDocs = (docs ?? []).filter((d) => d.role === "customer");
@@ -718,15 +748,55 @@ function ReviewRoomPage() {
 
           {rows.length > 0 && <ColourLegend counts={counts} />}
 
+          {rows.length > 0 && (
+            <div className="border-b bg-background px-3 py-2 space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={findingQuery}
+                  onChange={(e) => setFindingQuery(e.target.value)}
+                  placeholder={t("review.findFinding")}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+              {criticalRows.length > 0 && !findingQuery ? (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                    {t("review.startHereFindings")}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {criticalRows.map((r) =>
+                      r.finding ? (
+                        <button
+                          key={r.finding.id}
+                          type="button"
+                          onClick={() => selectFinding(r.finding!.id)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-critical/30 bg-critical/8 px-2 py-1 text-[11px] text-critical hover:bg-critical/15"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-critical shrink-0" />
+                          <span className="truncate max-w-[14rem]">{r.criterion.name}</span>
+                        </button>
+                      ) : null,
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           <ClausePairsTeaser runId={runId} />
 
           <ScrollArea className="flex-1">
             <div className="p-4 lg:p-5 space-y-7">
-              {streamGroups.length === 0 ? (
+              {filteredStreamGroups.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground p-8">
-                  {isLive ? t("runDetail.agentsWorking") : t("runDetail.noFindings")}
+                  {findingQuery.trim()
+                    ? t("review.findEmpty")
+                    : isLive
+                      ? t("runDetail.agentsWorking")
+                      : t("runDetail.noFindings")}
                 </div>
-              ) : streamGroups.map((g) => (
+              ) : filteredStreamGroups.map((g) => (
                 <section key={g.label}>
                   <div className="flex items-center gap-2 mb-3 sticky top-0 bg-muted/90 backdrop-blur-sm py-1 z-[1]">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{g.label}</div>
@@ -775,7 +845,7 @@ function ReviewRoomPage() {
                     )}
                     onClick={() => selectPaneSide("supplier")}
                   >
-                    {t("dashboard.bidderPack")}
+                    {t("review.packSupplier")}
                   </button>
                   <button
                     type="button"
@@ -787,7 +857,7 @@ function ReviewRoomPage() {
                     )}
                     onClick={() => selectPaneSide("customer")}
                   >
-                    {t("dashboard.tenderPack")}
+                    {t("review.packCustomer")}
                   </button>
                 </div>
               )}
@@ -1076,7 +1146,7 @@ const EvidenceCard = React.forwardRef<
       )}
     >
       <div className="flex items-start gap-3">
-        <div className={cn("w-[3px] self-stretch rounded-full shrink-0", tone.dot)} />
+        <div className={cn("w-[5px] self-stretch rounded-full shrink-0", tone.dot)} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="text-sm font-medium leading-snug flex-1">{criterion.name}</div>

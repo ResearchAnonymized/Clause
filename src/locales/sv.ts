@@ -413,11 +413,11 @@ const sv: DeepPartial<Translation> = {
       },
       newAnalysis: {
         title: "Ny analys",
-        body: "Ladda upp en anbudspärm till vänster och en anbudsgivares pärm till höger. ZIP-filer packas upp automatiskt. Exempelpärmar finns för första övningen.",
+        body: "Kundpärm till vänster, leverantörspärm till höger. ZIP packas upp automatiskt. Ladda exempelfiler om du inte kan använda riktiga avtal än.",
       },
       analyses: {
         title: "Analyser",
-        body: "Varje granskning är en körning. Öppna en för att följa agenter, sedan mappning och rapporten.",
+        body: "Öppna en granskning. Analys är hemmet: färger, klicka sedan ett fynd. Kartläggning och rapport är extra.",
       },
       criteria: {
         title: "Kriteriebibliotek",
@@ -433,7 +433,7 @@ const sv: DeepPartial<Translation> = {
       },
       help: {
         title: "Hjälp",
-        body: "Den skriftliga manualen. Starta den här guiden eller Kom igång-checklistan här när du vill.",
+        body: "Fyra steg för tjänstechefen: ladda upp, vänta, läs färgerna, klicka på ämnet. Starta guiden här.",
       },
     },
   },
@@ -934,14 +934,15 @@ const sv: DeepPartial<Translation> = {
   },
   runs: {
     title: "Analyser",
-    subtitle: "Alla avtalsanalyser i denna arbetsyta.",
+    subtitle: "Öppna en analys igen — kund- och leverantörspärmarna finns kvar.",
     exportCsv: "Exportera CSV",
     compare: "Jämför",
+    multiBidder: "Flera anbudsgivare",
     newAnalysis: "Ny analys",
     emptyTitle: "Inga analyser ännu",
     emptyCopy: "Ladda upp en kundmall och en leverantörsoffert för att köra din första avtalsanalys.",
     startFirst: "Starta första analysen",
-    searchPlaceholder: "Sök på titel…",
+    searchPlaceholder: "Sök titel eller pärmnamn…",
     allStatuses: "Alla statusar",
     anySeverity: "Valfri allvarlighet",
     hasCritical: "Har kritiska",
@@ -1014,6 +1015,7 @@ const sv: DeepPartial<Translation> = {
     startedN: "Startade {{done}} av {{total}} analyser",
     failed: "Kunde inte starta analysen",
     sampleTitle: "Exempel · övningspärm för offentlig upphandling",
+    samplesAlways: "Inga riktiga avtal att anonymisera? Ladda exempelfilerna och öva på ett litet underlag.",
   },
 
   runDetail: {
@@ -1176,6 +1178,13 @@ const sv: DeepPartial<Translation> = {
     categoryShortLegal: "Villkor",
     categoryShortScope: "Omfattning",
     categoryShortOther: "Övrigt",
+    findFinding: "Hitta ett fynd (t.ex. uppsägning)",
+    findEmpty: "Inget fynd matchar sökningen.",
+    startHereFindings: "Börja här — kritiska",
+    navStartHere: "Börja här",
+    packCustomer: "Kundpärm",
+    packSupplier: "Leverantörspärm",
+    packFileCount: "{{count}} filer",
   },
 
   helpPage: {

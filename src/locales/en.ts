@@ -416,11 +416,11 @@ const en = {
       },
       newAnalysis: {
         title: "New analysis",
-        body: "Upload a tender pack on the left and a bidder pack on the right. ZIP files expand automatically. Sample packs are available for first-time practice.",
+        body: "Customer pack on the left, supplier pack on the right. ZIP unpacks automatically. Load sample packs if you cannot use real contracts yet.",
       },
       analyses: {
         title: "Analyses",
-        body: "Every review is a run. Open one to watch agents, then go to mapping and the report.",
+        body: "Open a review. Analysis is home: colours, then click a finding to see the clause. Mapping and Report are extra.",
       },
       criteria: {
         title: "Criteria library",
@@ -436,7 +436,7 @@ const en = {
       },
       help: {
         title: "Help",
-        body: "The written manual. Restart this tour or the getting-started checklist from here whenever you like.",
+        body: "Four steps for a service manager: upload, wait, read colours, click the topic. Restart the tour from here.",
       },
     },
   },
@@ -934,14 +934,15 @@ const en = {
   },
   runs: {
     title: "Analyses",
-    subtitle: "All contract analyses in this workspace.",
+    subtitle: "Reopen any analysis with its customer and supplier packs intact.",
     exportCsv: "Export CSV",
     compare: "Compare",
+    multiBidder: "Multi-bidder",
     newAnalysis: "New analysis",
     emptyTitle: "No analyses yet",
     emptyCopy: "Upload a customer template and a supplier offer to run your first contract analysis.",
     startFirst: "Start first analysis",
-    searchPlaceholder: "Search by title…",
+    searchPlaceholder: "Search title or pack name…",
     allStatuses: "All statuses",
     anySeverity: "Any severity",
     hasCritical: "Has critical",
@@ -1014,6 +1015,7 @@ const en = {
     startedN: "Started {{done}} of {{total}} analyses",
     failed: "Failed to start analysis",
     sampleTitle: "Sample · public procurement training pack",
+    samplesAlways: "No real contracts to anonymise? Load the sample packs and practise on a small set.",
   },
 
   runDetail: {
@@ -1176,6 +1178,13 @@ const en = {
     categoryShortLegal: "Legal",
     categoryShortScope: "Scope",
     categoryShortOther: "Other",
+    findFinding: "Find a finding (e.g. termination)",
+    findEmpty: "No finding matches that search.",
+    startHereFindings: "Start here — critical",
+    navStartHere: "Start here",
+    packCustomer: "Customer pack",
+    packSupplier: "Supplier pack",
+    packFileCount: "{{count}} files",
   },
 
   helpPage: {
