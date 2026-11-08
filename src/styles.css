@@ -229,10 +229,178 @@
 /* Marketing landing — navy stage + contract paper */
 .landing-hero-grid {
   background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, black 40%, transparent 75%);
+    linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 85% 75% at 55% 30%, black 35%, transparent 78%);
+  animation: landing-grid-shift 48s linear infinite;
+}
+
+.landing-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: landing-orb-drift 22s ease-in-out infinite;
+  will-change: transform;
+}
+.landing-orb-a {
+  width: 28rem;
+  height: 28rem;
+  left: -10%;
+  top: -18%;
+  background: #5b7cff;
+  opacity: 0.42;
+}
+.landing-orb-b {
+  width: 22rem;
+  height: 22rem;
+  right: 4%;
+  top: 12%;
+  background: #d4b483;
+  opacity: 0.22;
+  animation-delay: -7s;
+}
+.landing-orb-c {
+  width: 20rem;
+  height: 20rem;
+  left: 38%;
+  bottom: -28%;
+  background: #6ec8bc;
+  opacity: 0.16;
+  animation-delay: -13s;
+}
+
+@keyframes landing-orb-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, 5%, 0) scale(1.08);
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+@keyframes landing-grid-shift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 72px 72px;
+  }
+}
+
+@keyframes landing-dash {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+.landing-flow-line {
+  stroke-dasharray: 5 9;
+  animation: landing-dash 1.8s linear infinite;
+}
+
+@keyframes landing-chip-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(10 36 114 / 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(10 36 114 / 0);
+  }
+}
+.landing-chip-live {
+  animation: landing-chip-glow 1.6s ease-out infinite;
+}
+
+@keyframes landing-arrow-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+.landing-arrow-nudge {
+  display: inline-flex;
+  animation: landing-arrow-nudge 1.6s ease-in-out infinite;
+}
+
+.landing-step-join {
+  display: inline-flex;
+  animation: landing-arrow-nudge 1.8s ease-in-out infinite;
+}
+
+@keyframes landing-scan {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+}
+.landing-scan {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 42%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgb(185 28 28 / 0.14), transparent);
+  animation: landing-scan 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-orb,
+  .landing-float,
+  .landing-hero-grid,
+  .landing-flow-line,
+  .landing-chip-live,
+  .landing-arrow-nudge,
+  .landing-step-join,
+  .landing-scan {
+    animation: none;
+  }
+}
+
+/* Marketing page keeps the cream + navy look even if the app is in dark mode. */
+.landing-page {
+  color-scheme: light;
+  --background: oklch(0.99 0.004 250);
+  --foreground: oklch(0.18 0.05 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.05 264);
+  --muted: oklch(0.96 0.008 255);
+  --muted-foreground: oklch(0.5 0.03 258);
+  --accent: oklch(0.94 0.03 260);
+  --accent-foreground: oklch(0.24 0.1 267);
+  --border: oklch(0.9 0.015 258);
+  --brand: oklch(0.28 0.14 267);
+  --brand-foreground: oklch(0.99 0.004 250);
+  --paper: #f7f5f0;
+  --stage: #0a2472;
+  --stage-foreground: #ffffff;
+  --critical: oklch(0.55 0.22 27);
+  --warning: oklch(0.75 0.16 75);
+  --ok: oklch(0.62 0.14 155);
 }
 
 /* Soft workspace surface behind authenticated pages */

@@ -14,6 +14,12 @@ export const SUPPORTED_LANGS = [
 
 export type LangCode = (typeof SUPPORTED_LANGS)[number]["code"];
 
+function loadResources() {
+  i18n.addResourceBundle("en", "translation", en, true, true);
+  i18n.addResourceBundle("fi", "translation", fi, true, true);
+  i18n.addResourceBundle("sv", "translation", sv, true, true);
+}
+
 if (!i18n.isInitialized) {
   i18n
     .use(LanguageDetector)
@@ -33,6 +39,14 @@ if (!i18n.isInitialized) {
         lookupLocalStorage: "clause.lang",
       },
     });
+} else {
+  loadResources();
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(["@/locales/en", "@/locales/fi", "@/locales/sv"], () => {
+    loadResources();
+  });
 }
 
 export default i18n;

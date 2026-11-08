@@ -76,6 +76,7 @@ function useCycle(length: number, ms: number, paused: boolean) {
 
 /** Compact hero: packs feed the orchestrator, specialists fire, the gap is the punchline. */
 export function LandingHeroOrchestra({ t }: { t: TFn }) {
+  const reduce = useReducedMotion();
   const [pinned, setPinned] = useState<AgentKind | null>(null);
   const steps: AgentKind[] = ["orchestrator", ...SPECIALISTS, "reviewer"];
   const idx = useCycle(steps.length, 2200, pinned !== null);
@@ -87,7 +88,7 @@ export function LandingHeroOrchestra({ t }: { t: TFn }) {
 
   return (
     <div className="relative">
-      <div className="rounded-xl border border-border bg-white text-stage shadow-[0_28px_80px_-20px_rgba(10,36,114,0.22)] overflow-hidden">
+      <div className="rounded-2xl border border-white/20 bg-white text-stage shadow-[0_32px_90px_-24px_rgba(6,16,48,0.55)] overflow-hidden ring-1 ring-white/20">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-stage text-white">
           <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
             <span className="relative flex h-2 w-2">
@@ -96,8 +97,30 @@ export function LandingHeroOrchestra({ t }: { t: TFn }) {
             </span>
             {t("landing.liveAgents")}
           </span>
-          <span className="text-[11px] text-white/70">{t("landing.analysing")}</span>
+          <span className="flex items-center gap-1.5" aria-hidden>
+            {steps.map((kind) => (
+              <span
+                key={kind}
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full transition-all duration-300",
+                  kind === active ? "bg-white scale-125" : "bg-white/30",
+                )}
+              />
+            ))}
+          </span>
         </div>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={active}
+            className="px-4 py-2 text-[12px] text-stage/80 bg-[#f4f1ea] border-b border-black/8"
+            initial={reduce ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, y: 4 }}
+            transition={{ duration: 0.2 }}
+          >
+            {t(`landing.cycle.${active}`)}
+          </motion.p>
+        </AnimatePresence>
 
         <div className="relative px-3 pt-4 pb-2">
           <HeroGraph active={active} t={t} onPin={setPinned} />
@@ -106,9 +129,9 @@ export function LandingHeroOrchestra({ t }: { t: TFn }) {
         <AnimatePresence mode="wait">
           <motion.div
             key={findingKind}
-            initial={{ opacity: 0, y: 6 }}
+            initial={reduce ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
+            exit={reduce ? undefined : { opacity: 0, y: -6 }}
             transition={{ duration: 0.22 }}
           >
             <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-black/10 bg-black/[0.04]">
@@ -163,8 +186,26 @@ function HeroGraph({
             return `M 320 70 Q 320 110 ${x} 132`;
           }),
         ].map((d) => (
-          <path key={d} d={d} fill="none" stroke="url(#heroLine)" strokeWidth="1.2" strokeDasharray="4 6" />
+          <path
+            key={d}
+            d={d}
+            className={reduce ? undefined : "landing-flow-line"}
+            fill="none"
+            stroke="url(#heroLine)"
+            strokeWidth="1.2"
+            strokeDasharray="4 6"
+          />
         ))}
+        {!reduce && active === "orchestrator" && (
+          <>
+            <circle key="from-tender" r="3.5" fill="var(--stage)">
+              <animateMotion dur="0.9s" repeatCount="1" path="M 70 36 H 250" fill="freeze" />
+            </circle>
+            <circle key="from-bidder" r="3.5" fill="var(--stage)">
+              <animateMotion dur="0.9s" repeatCount="1" path="M 570 36 H 390" fill="freeze" />
+            </circle>
+          </>
+        )}
         {!reduce && isSpecialist(active) && (
           <circle key={`to-${active}`} r="3.5" fill="var(--stage)">
             <animateMotion
@@ -182,8 +223,8 @@ function HeroGraph({
         )}
       </svg>
 
-      <PackChip className="absolute left-0 top-1" label={t("landing.sampleTender")} />
-      <PackChip className="absolute right-0 top-1" label={t("landing.sampleBidder")} />
+      <PackChip className="absolute left-0 top-1" label={t("landing.sampleTender")} live={active === "orchestrator"} />
+      <PackChip className="absolute right-0 top-1" label={t("landing.sampleBidder")} live={active === "orchestrator"} />
 
       <button
         type="button"
@@ -223,11 +264,12 @@ function HeroGraph({
   );
 }
 
-function PackChip({ className, label }: { className?: string; label: string }) {
+function PackChip({ className, label, live }: { className?: string; label: string; live?: boolean }) {
   return (
     <div
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.04] px-2 py-1 text-[10px] font-medium text-stage",
+        live && "landing-chip-live border-stage/30 bg-stage/8",
         className,
       )}
     >
@@ -361,16 +403,27 @@ export function LandingAgentBoard({ t }: { t: TFn }) {
         })}
       </div>
 
-      <div className="border-t border-border bg-muted/40 px-5 py-4 flex items-start gap-3">
-        <AgentAvatar kind={active} size="sm" pulse />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-foreground">{t(`agents.${active}.title`)}</p>
-            <ToneChip tone={finding.tone} />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{finding.title}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t(`agents.${active}.does`)}</p>
-        </div>
+      <div className="border-t border-border bg-muted/40 px-5 py-4 flex items-start gap-3 min-h-[6.5rem]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            className="flex min-w-0 flex-1 items-start gap-3"
+            initial={reduce ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, y: -8 }}
+            transition={{ duration: 0.28 }}
+          >
+            <AgentAvatar kind={active} size="sm" pulse />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-semibold text-foreground">{t(`agents.${active}.title`)}</p>
+                <ToneChip tone={finding.tone} />
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{finding.title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t(`agents.${active}.does`)}</p>
+            </div>
+          </motion.div>
+        </AnimatePresence>
         <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0 pt-1">
           <Scale size={12} /> {t("agents.reviewer.title")}
         </span>
@@ -383,7 +436,15 @@ function MiniQuote({ kicker, value, warn }: { kicker: string; value: string; war
   return (
     <div className={`px-4 py-3 ${warn ? "bg-critical/5" : "bg-black/[0.04]"} ${warn ? "" : "border-r border-black/10"}`}>
       <p className="text-[10px] uppercase tracking-wider font-semibold text-stage/55">{kicker}</p>
-      <p className={`mt-1 font-display text-2xl font-semibold ${warn ? "text-critical" : "text-stage"}`}>{value}</p>
+      <motion.p
+        key={value + String(warn)}
+        className={`mt-1 font-display text-2xl font-semibold ${warn ? "text-critical" : "text-stage"}`}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28 }}
+      >
+        {value}
+      </motion.p>
     </div>
   );
 }

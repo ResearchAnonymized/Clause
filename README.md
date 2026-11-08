@@ -1,14 +1,29 @@
-# Counterpart
+# CounterPart
 
-Multi-agent contract intelligence — self-hosted TanStack Start + Postgres + MinIO.
+See the gaps that matter.
 
-## Stack
+Customer pack on the left. Supplier pack on the right. Evidence on every critical risk.
 
-- **App:** React 19 + TanStack Start / Router / Query
-- **DB:** PostgreSQL 16 + pgvector
-- **Auth:** Cookie sessions (`clause_session`)
-- **Files:** MinIO (S3) or local filesystem
-- **AI:** OpenAI-compatible API (`AI_BASE_URL` + `AI_API_KEY`) — analysis runs inline in the app
+![CounterPart welcome page — specialist agents compare a tender pack with a bidder pack and surface a cited SLA gap](docs/readme-hero.png)
+
+The finding is one card, and it moves. The customer pack is the requester, the supplier pack is the producer, and the reviewer is the consumer. On the sample SLA case the card carries **99.9%** from the tender and **99.0%** from the draft. Self-asserted uptime is not an accepted match, so CounterPart keeps both quotes in view and the card returns stamped **critical**.
+
+```mermaid
+flowchart LR
+  C[Customer pack] --> O[Orchestrator]
+  S[Supplier pack] --> O
+  O --> A[SLA · DPA · InfoSec · Notice · Pricing]
+  A --> R[Senior reviewer]
+  R --> G[Cited gap + report]
+```
+
+The same sequence plays on the [welcome page](https://usecounterpart.com). This repository holds the app, the sample packs, and the review trail.
+
+| Step | What you see |
+|------|----------------|
+| Upload | PDF, Word, text, or ZIP. Customer pack left, supplier pack right. |
+| Orchestrate | Specialist agents run in parallel — SLA, DPA, InfoSec, notice, pricing. |
+| Report | Prioritised findings, clause-level evidence, PDF or CSV. |
 
 ## Quick start
 
@@ -23,6 +38,14 @@ pnpm run dev
 ```
 
 Open http://localhost:3000 — sign up with email/password. The **first user becomes platform admin** and gets a personal workspace/organization.
+
+## Stack
+
+- **App:** React 19 + TanStack Start / Router / Query
+- **DB:** PostgreSQL 16 + pgvector
+- **Auth:** Cookie sessions (`clause_session`)
+- **Files:** MinIO (S3) or local filesystem
+- **AI:** OpenAI-compatible API (`AI_BASE_URL` + `AI_API_KEY`) — analysis runs inline in the app
 
 ## Testing
 
@@ -82,6 +105,7 @@ Apply schema with `db/schema.sql` and additive `db/migrate-*.sql` (see `deploy/a
 - Browser data access is proxied through `/api/db` (authenticated).
 - Realtime run updates use short polling.
 - Do not commit `.env` or secrets.
+- Product change notes: [`docs/wiki/Home.md`](./docs/wiki/Home.md)
 
 ## Production
 
