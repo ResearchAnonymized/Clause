@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Upload, Play, FileText, X, Layers, Package } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { PageBack, PageBreadcrumbs } from "@/components/page-back";
 
 export const Route = createFileRoute("/_authenticated/runs/new")({
@@ -42,6 +43,7 @@ const MAX_ZIP = 50 * 1024 * 1024;
 type Mode = "single" | "tender" | "bulk";
 
 function NewRunPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaceId, role } = useCurrentWorkspace();
@@ -199,7 +201,7 @@ function NewRunPage() {
     try {
       if (mode === "single") {
         if (!customerFile || !supplierFile) {
-          toast.error("Upload both contracts");
+          toast.error(t("newRun.needBoth"));
           setBusy(false);
           return;
         }
@@ -213,18 +215,18 @@ function NewRunPage() {
         });
         toast.success(
           suppliers.length > 1 || customers.length > 1
-            ? `Analysis started (${customers.length} tender + ${suppliers.length} bidder docs)`
-            : "Analysis started",
+            ? t("newRun.startedCounts", { customer: customers.length, supplier: suppliers.length })
+            : t("newRun.started"),
         );
         navigate({ to: "/runs/$runId", params: { runId } });
       } else if (mode === "tender") {
         if (!tenderFiles.length) {
-          toast.error("Upload the tender / customer documents");
+          toast.error(t("newRun.needCustomer"));
           setBusy(false);
           return;
         }
         if (!bidderFiles.length) {
-          toast.error("Upload the bidder pack (ZIP or files)");
+          toast.error(t("newRun.needSupplier"));
           setBusy(false);
           return;
         }
@@ -237,17 +239,17 @@ function NewRunPage() {
           supplierFiles: bidderFiles,
         });
         toast.success(
-          `Analysis started — ${customers.length} tender doc(s) vs ${suppliers.length} bidder doc(s)`,
+          t("newRun.startedCounts", { customer: customers.length, supplier: suppliers.length }),
         );
         navigate({ to: "/runs/$runId", params: { runId } });
       } else {
         if (!customerFile) {
-          toast.error("Upload the customer / tender baseline");
+          toast.error(t("newRun.needBaseline"));
           setBusy(false);
           return;
         }
         if (bulkFiles.length === 0) {
-          toast.error("Add at least one bidder file or ZIP");
+          toast.error(t("newRun.needBidder"));
           setBusy(false);
           return;
         }
@@ -265,11 +267,11 @@ function NewRunPage() {
             toast.error(`${f.name}: ${err?.message ?? err}`);
           }
         }
-        toast.success(`Started ${done} of ${bulkFiles.length} analyses`);
+        toast.success(t("newRun.startedN", { done, total: bulkFiles.length }));
         navigate({ to: "/runs" });
       }
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to start analysis");
+      toast.error(err?.message ?? t("newRun.failed"));
     } finally {
       setBusy(false);
     }
@@ -278,12 +280,10 @@ function NewRunPage() {
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
       <div className="space-y-2" data-tour-stage="newAnalysis">
-        <PageBack label="Back to analyses" fallback={{ to: "/runs" }} />
-        <PageBreadcrumbs items={[{ label: "Analyses", to: "/runs" }, { label: "New analysis" }]} />
-        <h1 className="text-2xl font-semibold tracking-tight">New analysis</h1>
-        <p className="text-muted-foreground mt-1">
-          Compare a tender / customer baseline against a bidder response — including multi-file ZIP packs common in Finnish and EU procurements.
-        </p>
+        <PageBack label={t("newRun.back")} fallback={{ to: "/runs" }} />
+        <PageBreadcrumbs items={[{ label: t("runs.title"), to: "/runs" }, { label: t("newRun.title") }]} />
+        <h1 className="text-2xl font-semibold tracking-tight">{t("newRun.title")}</h1>
+        <p className="text-muted-foreground mt-1">{t("newRun.subtitle")}</p>
       </div>
 
       <NewRunCoach
@@ -292,120 +292,109 @@ function NewRunPage() {
           setMode("tender");
           setTenderFiles(tender);
           setBidderFiles(bidder);
-          if (!title) setTitle("Sample · public procurement training pack");
+          if (!title) setTitle(t("newRun.sampleTitle"));
         }}
       />
 
       <form onSubmit={submit} noValidate>
         <Card>
           <CardHeader>
-            <CardTitle>Documents</CardTitle>
-            <CardDescription>
-              PDF, DOCX, DOC, TXT, or ZIP packs — documents up to 20&nbsp;MB each, ZIPs up to 50&nbsp;MB.
-            </CardDescription>
+            <CardTitle>{t("newRun.documents")}</CardTitle>
+            <CardDescription>{t("newRun.documentsHint")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
               <TabsList className="grid w-full grid-cols-3 h-auto">
                 <TabsTrigger value="tender" className="text-xs sm:text-sm py-2">
                   <Package className="h-3.5 w-3.5 mr-1 shrink-0" />
-                  Tender pack
+                  {t("newRun.tabTender")}
                 </TabsTrigger>
                 <TabsTrigger value="single" className="text-xs sm:text-sm py-2">
-                  Single pair
+                  {t("newRun.tabSingle")}
                 </TabsTrigger>
                 <TabsTrigger value="bulk" className="text-xs sm:text-sm py-2">
                   <Layers className="h-3.5 w-3.5 mr-1 shrink-0" />
-                  Many bidders
+                  {t("newRun.tabBulk")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="tender" className="pt-4 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Typical Hilma / EU pattern: one tender (or annex ZIP) vs one bidder ZIP with offer, price schedule,
-                  DPA, certificates, etc. Everything lands in <span className="font-medium text-foreground">one analysis</span>;
-                  agents retrieve across all files. Review the document register below before starting.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("newRun.tenderLead")}</p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <MultiDrop
-                    label="Tender / customer docs"
-                    hint="Tender PDF or ZIP of annexes"
+                    label={t("newRun.customerDocs")}
+                    hint={t("newRun.customerHint")}
                     files={tenderFiles}
                     onFiles={setTenderFiles}
                     highlighted={coachPhase === "tender"}
                   />
                   <MultiDrop
-                    label="Bidder response pack"
-                    hint="ZIP or multiple PDF/DOCX files"
+                    label={t("newRun.supplierDocs")}
+                    hint={t("newRun.supplierHint")}
                     files={bidderFiles}
                     onFiles={setBidderFiles}
                     highlighted={coachPhase === "bidder"}
                   />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <PackPreview files={tenderFiles} label="Tender pack register" />
-                  <PackPreview files={bidderFiles} label="Bidder pack register" />
+                  <PackPreview files={tenderFiles} label={t("newRun.customerRegister")} />
+                  <PackPreview files={bidderFiles} label={t("newRun.supplierRegister")} />
                 </div>
               </TabsContent>
 
               <TabsContent value="single" className="pt-4 grid gap-4 md:grid-cols-2">
                 <DropStub
-                  label="Customer / tender"
+                  label={t("newRun.singleCustomer")}
                   file={customerFile}
                   onFile={setCustomerFile}
                   allowZip
                 />
                 <DropStub
-                  label="Supplier / bidder"
+                  label={t("newRun.singleSupplier")}
                   file={supplierFile}
                   onFile={setSupplierFile}
                   allowZip
                 />
-                <p className="md:col-span-2 text-xs text-muted-foreground">
-                  If you drop a ZIP on either side, nested PDF/DOCX files are expanded into that side of the same run.
-                </p>
+                <p className="md:col-span-2 text-xs text-muted-foreground">{t("newRun.zipExpands")}</p>
               </TabsContent>
 
               <TabsContent value="bulk" className="pt-4 space-y-4">
                 <DropStub
-                  label="Shared tender / customer baseline"
+                  label={t("newRun.bulkCustomer")}
                   file={customerFile}
                   onFile={setCustomerFile}
                   allowZip
                 />
                 <MultiDrop
-                  label="Bidder files (one analysis each)"
-                  hint="Each file or ZIP = a separate bidder comparison"
+                  label={t("newRun.bulkSuppliers")}
+                  hint={t("newRun.bulkHint")}
                   files={bulkFiles}
                   onFiles={setBulkFiles}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Use when comparing the same tender against several bidders. A ZIP under one bidder expands into that
-                  bidder’s pack only.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("newRun.bulkLead")}</p>
               </TabsContent>
             </Tabs>
 
             {(mode === "single" || mode === "tender") && (
               <div className="space-y-1.5">
-                <Label htmlFor="run-title">Analysis title (optional)</Label>
+                <Label htmlFor="run-title">{t("newRun.titleLabel")}</Label>
                 <Input
                   id="run-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. CareFlow tender · Bidder A · 2026"
+                  placeholder={t("newRun.titlePlaceholder")}
                 />
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label>Criteria set</Label>
+              <Label>{t("newRun.criteria")}</Label>
               <Select value={criteriaSetId} onValueChange={setCriteriaSetId}>
-                <SelectTrigger><SelectValue placeholder="Select a criteria set" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("newRun.criteriaPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {sets?.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name} {s.is_default && "· default"}
+                      {s.name} {s.is_default && t("newRun.criteriaDefault")}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -426,7 +415,7 @@ function NewRunPage() {
               }
             }}
           >
-            Cancel
+            {t("newRun.cancel")}
           </Button>
           <Button
             type="button"
@@ -438,11 +427,13 @@ function NewRunPage() {
             <Play className="w-4 h-4 mr-1" />
             {busy
               ? mode === "bulk"
-                ? `Starting ${bulkFiles.length}…`
-                : "Unpacking & starting…"
+                ? t("newRun.startingN", { n: bulkFiles.length })
+                : t("newRun.unpacking")
               : mode === "bulk"
-              ? `Start ${bulkFiles.length || ""} ${bulkFiles.length === 1 ? "analysis" : "analyses"}`.trim()
-              : "Start analysis"}
+              ? bulkFiles.length === 1
+                ? t("newRun.startOne")
+                : t("newRun.startN", { n: bulkFiles.length || "" })
+              : t("newRun.start")}
           </Button>
         </div>
       </form>
@@ -465,17 +456,22 @@ function DropStub({
   onFile: (f: File | null) => void;
   allowZip?: boolean;
 }) {
+  const { t } = useTranslation();
   const onDrop = useCallback(
     (accepted: File[]) => {
       const f = accepted[0];
       if (!f) return;
       if (f.size > fileCap(f)) {
-        toast.error(f.name.toLowerCase().endsWith(".zip") ? "ZIP exceeds 50 MB" : "File exceeds 20 MB");
+        toast.error(
+          f.name.toLowerCase().endsWith(".zip")
+            ? t("newRun.tooLargeZip", { name: f.name })
+            : t("newRun.tooLargeDoc", { name: f.name }),
+        );
         return;
       }
       onFile(f);
     },
-    [onFile],
+    [onFile, t],
   );
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -510,9 +506,9 @@ function DropStub({
         >
           <input {...getInputProps()} />
           <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
-          <div className="text-sm font-medium">{isDragActive ? "Drop it here" : "Drop file or click to browse"}</div>
+          <div className="text-sm font-medium">{isDragActive ? t("newRun.dropHere") : t("newRun.dropOrBrowse")}</div>
           <div className="text-xs text-muted-foreground mt-1">
-            PDF, DOCX, DOC, TXT{allowZip ? ", ZIP" : ""} · docs 20 MB / ZIP 50 MB
+            {t("newRun.formats", { zip: allowZip ? ", ZIP" : "" })}
           </div>
         </div>
       )}
@@ -533,12 +529,15 @@ function MultiDrop({
   onFiles: (f: File[]) => void;
   highlighted?: boolean;
 }) {
+  const { t } = useTranslation();
   const onDrop = useCallback(
     (accepted: File[]) => {
       const filtered = accepted.filter((f) => {
         if (f.size > fileCap(f)) {
           toast.error(
-            `${f.name} exceeds ${f.name.toLowerCase().endsWith(".zip") ? "50" : "20"} MB`,
+            f.name.toLowerCase().endsWith(".zip")
+              ? t("newRun.tooLargeZip", { name: f.name })
+              : t("newRun.tooLargeDoc", { name: f.name }),
           );
           return false;
         }
@@ -546,7 +545,7 @@ function MultiDrop({
       });
       onFiles([...files, ...filtered]);
     },
-    [files, onFiles],
+    [files, onFiles, t],
   );
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -574,7 +573,7 @@ function MultiDrop({
       >
         <input {...getInputProps()} />
         <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
-        <div className="text-sm font-medium">{isDragActive ? "Drop files here" : "Drop files or click to browse"}</div>
+        <div className="text-sm font-medium">{isDragActive ? t("newRun.dropFilesHere") : t("newRun.dropFilesOrBrowse")}</div>
         <div className="text-xs text-muted-foreground mt-1">{hint ?? "PDF, DOCX, TXT, or ZIP"}</div>
       </div>
       {files.length > 0 && (

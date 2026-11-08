@@ -111,6 +111,56 @@ function shortenCategory(cat: string | null | undefined): string {
   return SHORT_CATEGORY_LABELS[key] ?? cat;
 }
 
+const CATEGORY_TOPIC_KEY: Record<string, string> = {
+  SLA: "review.categorySla",
+  DPA: "review.categoryDpa",
+  GDPR: "review.categoryDpa",
+  INFOSEC: "review.categoryInfosec",
+  SECURITY: "review.categoryInfosec",
+  PRICING: "review.categoryPricing",
+  COMMERCIAL: "review.categoryPricing",
+  LEGAL: "review.categoryLegal",
+  IPR: "review.categoryLegal",
+  EXIT: "review.categoryExit",
+  TERMINATION: "review.categoryExit",
+  SCOPE: "review.categoryScope",
+  SUPPORT: "review.categoryScope",
+  CHANGE: "review.categoryLegal",
+  COMPLIANCE: "review.categoryLegal",
+};
+
+const CATEGORY_SHORT_KEY: Record<string, string> = {
+  SLA: "review.categoryShortSla",
+  DPA: "review.categoryShortDpa",
+  GDPR: "review.categoryShortDpa",
+  INFOSEC: "review.categoryShortInfosec",
+  SECURITY: "review.categoryShortInfosec",
+  PRICING: "review.categoryShortPricing",
+  COMMERCIAL: "review.categoryShortPricing",
+  LEGAL: "review.categoryShortLegal",
+  IPR: "review.categoryShortLegal",
+  EXIT: "review.categoryShortExit",
+  TERMINATION: "review.categoryShortExit",
+  SCOPE: "review.categoryShortScope",
+  SUPPORT: "review.categoryShortScope",
+  CHANGE: "review.categoryShortLegal",
+  COMPLIANCE: "review.categoryShortLegal",
+  __OTHER__: "review.categoryShortOther",
+};
+
+function topicLabel(t: TFunction, cat: string | null | undefined): string {
+  const key = (cat ?? "").trim().toUpperCase();
+  if (!key || key === "__OTHER__") return t("review.categoryOther");
+  const i18nKey = CATEGORY_TOPIC_KEY[key];
+  return i18nKey ? t(i18nKey) : expandCategory(cat);
+}
+
+function topicShort(t: TFunction, catKey: string): string {
+  const key = catKey.trim().toUpperCase() || "__OTHER__";
+  const i18nKey = CATEGORY_SHORT_KEY[key];
+  return i18nKey ? t(i18nKey) : shortenCategory(catKey);
+}
+
 function ReviewRoomPage() {
   const { t } = useTranslation();
   const { runId } = Route.useParams();
@@ -170,7 +220,7 @@ function ReviewRoomPage() {
     const map = new Map<string, { key: string; label: string; total: number; c: Record<Verdict, number> }>();
     for (const r of rows) {
       const key = (r.criterion.category?.trim().toUpperCase()) || "__OTHER__";
-      const label = key === "__OTHER__" ? "Other" : expandCategory(r.criterion.category);
+      const label = topicLabel(t, key === "__OTHER__" ? null : r.criterion.category);
       const g = map.get(key) ?? { key, label, total: 0, c: { aligned: 0, partial: 0, gap: 0, not_addressed: 0 } };
       g.total += 1;
       g.c[toVerdict(r.finding?.severity)]++;
@@ -182,7 +232,7 @@ function ReviewRoomPage() {
       if (riskB !== riskA) return riskB - riskA;
       return a.label.localeCompare(b.label);
     });
-  }, [rows]);
+  }, [rows, t]);
 
   const visibleRows = useMemo(
     () => (activeCat === "__all__" ? rows : rows.filter((r) => ((r.criterion.category?.trim().toUpperCase()) || "__OTHER__") === activeCat)),
@@ -193,7 +243,7 @@ function ReviewRoomPage() {
   const streamGroups = useMemo(() => {
     const m = new Map<string, { label: string; items: typeof visibleRows }>();
     for (const r of visibleRows) {
-      const label = expandCategory(r.criterion.category) || "Other";
+      const label = topicLabel(t, r.criterion.category);
       const g = m.get(label) ?? { label, items: [] as typeof visibleRows };
       g.items.push(r);
       m.set(label, g);
@@ -210,7 +260,7 @@ function ReviewRoomPage() {
       }, 0);
       return risk(b.items) - risk(a.items);
     });
-  }, [visibleRows]);
+  }, [visibleRows, t]);
 
   const supplierDocs = (docs ?? []).filter((d) => d.role === "supplier");
   const customerDocs = (docs ?? []).filter((d) => d.role === "customer");
@@ -666,6 +716,8 @@ function ReviewRoomPage() {
             />
           )}
 
+          {rows.length > 0 && <ColourLegend counts={counts} />}
+
           <ClausePairsTeaser runId={runId} />
 
           <ScrollArea className="flex-1">
@@ -1046,6 +1098,38 @@ const EvidenceCard = React.forwardRef<
   );
 });
 
+function ColourLegend({ counts }: { counts: Record<Verdict, number> }) {
+  const { t } = useTranslation();
+  return (
+    <div data-testid="colour-legend" className="border-b bg-background px-3 py-2 space-y-1.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {t("review.colourLegend")}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-critical" />
+          {t("review.colourCritical")}
+          <span className="font-medium tabular-nums text-foreground">{counts.gap}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+          {t("review.colourPartial")}
+          <span className="font-medium tabular-nums text-foreground">{counts.partial}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-ok" />
+          {t("review.colourAligned")}
+          <span className="font-medium tabular-nums text-foreground">{counts.aligned}</span>
+        </span>
+      </div>
+      {counts.gap === 0 ? (
+        <p className="text-[11px] text-muted-foreground leading-snug">{t("review.colourNoneCritical")}</p>
+      ) : null}
+      <p className="text-[11px] text-muted-foreground leading-snug">{t("review.clickFinding")}</p>
+    </div>
+  );
+}
+
 function AgentTabs({
   groups, total, counts, activeCat, onSelect, t,
 }: {
@@ -1121,7 +1205,7 @@ function AgentTabs({
               <AgentTab
                 key={g.key}
                 label={g.label}
-                shortLabel={shortenCategory(g.key)}
+                shortLabel={topicShort(t, g.key)}
                 total={g.total}
                 counts={g.c}
                 selected={activeCat === g.key}
